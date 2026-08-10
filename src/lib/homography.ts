@@ -24,33 +24,42 @@ function validQuad(points: Point[]): boolean {
  */
 function solve(A: number[][], b: number[]): number[] | null {
   const n = b.length;
-  const m = A.map((row, i) => [...row, b[i]]);
+  const w = n + 1;
+  // Flat augmented matrix keeps every access a plain number (no undefined).
+  const m = new Float64Array(n * w);
+  for (let r = 0; r < n; r += 1) {
+    const row = A[r] ?? [];
+    for (let c = 0; c < n; c += 1) m[r * w + c] = row[c] ?? 0;
+    m[r * w + n] = b[r] ?? 0;
+  }
 
   for (let col = 0; col < n; col += 1) {
     let pivot = col;
     for (let row = col + 1; row < n; row += 1) {
-      if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
+      if (Math.abs(m[row * w + col]!) > Math.abs(m[pivot * w + col]!)) pivot = row;
     }
-    if (Math.abs(m[pivot][col]) < EPS) return null;
+    if (Math.abs(m[pivot * w + col]!) < EPS) return null;
     if (pivot !== col) {
-      const tmp = m[pivot];
-      m[pivot] = m[col];
-      m[col] = tmp;
+      for (let k = 0; k < w; k += 1) {
+        const tmp = m[pivot * w + k]!;
+        m[pivot * w + k] = m[col * w + k]!;
+        m[col * w + k] = tmp;
+      }
     }
-    const pv = m[col][col];
+    const pv = m[col * w + col]!;
     for (let row = 0; row < n; row += 1) {
       if (row === col) continue;
-      const factor = m[row][col] / pv;
+      const factor = m[row * w + col]! / pv;
       if (!isFiniteNumber(factor)) return null;
-      for (let k = col; k <= n; k += 1) {
-        m[row][k] -= factor * m[col][k];
+      for (let k = col; k < w; k += 1) {
+        m[row * w + k] = m[row * w + k]! - factor * m[col * w + k]!;
       }
     }
   }
 
   const out = new Array<number>(n);
   for (let i = 0; i < n; i += 1) {
-    const v = m[i][n] / m[i][i];
+    const v = m[i * w + n]! / m[i * w + i]!;
     if (!isFiniteNumber(v)) return null;
     out[i] = v;
   }
@@ -68,20 +77,21 @@ export function computeHomography(src: Point[], dst: Point[]): Matrix3 {
   const A: number[][] = [];
   const b: number[] = [];
   for (let i = 0; i < 4; i += 1) {
-    const { x, y } = src[i];
-    const { x: u, y: v } = dst[i];
-    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]);
-    b.push(u);
-    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]);
-    b.push(v);
+    const s = src[i]!;
+    const d = dst[i]!;
+    A.push([s.x, s.y, 1, 0, 0, 0, -d.x * s.x, -d.x * s.y]);
+    b.push(d.x);
+    A.push([0, 0, 0, s.x, s.y, 1, -d.y * s.x, -d.y * s.y]);
+    b.push(d.y);
   }
 
   const h = solve(A, b);
   if (!h) return [...IDENTITY] as Matrix3;
 
-  const matrix: Matrix3 = [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+  const matrix: Matrix3 = [h[0]!, h[1]!, h[2]!, h[3]!, h[4]!, h[5]!, h[6]!, h[7]!, 1];
   return matrix.every(isFiniteNumber) ? matrix : ([...IDENTITY] as Matrix3);
 }
+
 
 /** Invert a 3x3 matrix; returns identity when non-invertible. */
 export function invert(m: Matrix3): Matrix3 {
