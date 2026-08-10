@@ -226,7 +226,7 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
                   key={`${n.id}-label`}
                   x={n.x + 8}
                   y={n.y + 8}
-                  text="\u266A particles"
+                  text={"\u266A particles"}
                   fill={n.color}
                   fontSize={16}
                   listening={false}
