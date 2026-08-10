@@ -174,7 +174,7 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
                     closed
                     stroke={state.selectedId === node.id ? "#38bdf8" : "rgba(148,163,184,0.6)"}
                     strokeWidth={2 / scale}
-                    shadowColor={node.glow ? node.color : undefined}
+                    shadowColor={node.glow ? node.color : "transparent"}
                     shadowBlur={node.glow ? 20 + node.glowIntensity * 60 : 0}
                     {...fillProps(node)}
                   />
@@ -212,7 +212,7 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
                   opacity={node.opacity}
                   stroke={state.selectedId === node.id ? "#38bdf8" : "rgba(148,163,184,0.6)"}
                   strokeWidth={2 / scale}
-                  shadowColor={node.glow ? node.color : undefined}
+                  shadowColor={node.glow ? node.color : "transparent"}
                   shadowBlur={node.glow ? 20 + node.glowIntensity * 60 : 0}
                   {...fillProps(node)}
                 />
