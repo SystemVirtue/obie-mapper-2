@@ -25,6 +25,7 @@ const FRAG = /* glsl */ `
   uniform mat3 uInverseHomography;
   uniform float uGainLeft;
   uniform float uGainRight;
+  uniform float uBrightness;
 
   void main() {
     vec2 dest = vec2(vUv.x, 1.0 - vUv.y);
@@ -40,10 +41,11 @@ const FRAG = /* glsl */ `
     }
     vec4 color = texture2D(uTexture, uv);
     // Horizontal falloff compensation across the throw distance.
-    float gain = mix(uGainLeft, uGainRight, uv.x);
+    float gain = mix(uGainLeft, uGainRight, uv.x) * uBrightness;
     gl_FragColor = vec4(clamp(color.rgb * gain, 0.0, 1.0), 1.0);
   }
 `;
+
 
 interface Props {
   state: ProjectState;
