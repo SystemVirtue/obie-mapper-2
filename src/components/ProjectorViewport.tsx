@@ -112,7 +112,9 @@ export default function ProjectorViewport({ state, onCornersChange, showHandles 
       uInverseHomography: { value: new THREE.Matrix3().fromArray(toGlslMat3(inverseRef.current)) },
       uGainLeft: { value: stateRef.current.gainLeft },
       uGainRight: { value: stateRef.current.gainRight },
+      uBrightness: { value: stateRef.current.brightness },
     };
+
 
     let material: THREE.Material = new THREE.ShaderMaterial({
       vertexShader: VERT,
@@ -158,6 +160,8 @@ export default function ProjectorViewport({ state, onCornersChange, showHandles 
         uniforms.uInverseHomography.value.fromArray(toGlslMat3(inverseRef.current));
         uniforms.uGainLeft.value = s.gainLeft;
         uniforms.uGainRight.value = s.gainRight;
+        uniforms.uBrightness.value = Number.isFinite(s.brightness) ? s.brightness : 1;
+
       } else {
         // Warp the quad vertices with the corner pins instead of in the shader.
         const attr = geometry.attributes["position"] as THREE.BufferAttribute;
