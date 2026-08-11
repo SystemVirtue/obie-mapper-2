@@ -191,14 +191,49 @@ export default function InspectorPanel({ state, onUpdateNode, onPatch }: Props) 
             className="w-full accent-primary"
           />
         </Row>
-        <button
-          type="button"
-          onClick={() => onPatch({ showGrid: !state.showGrid })}
-          className="w-full rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {state.showGrid ? "Hide stage grid" : "Show stage grid"}
-        </button>
+        <Row label={`Global brightness ${Math.round(state.brightness * 100)}%`}>
+          <input
+            type="range"
+            min={0}
+            max={200}
+            value={Math.round(state.brightness * 100)}
+            onChange={(e) => onPatch({ brightness: Number(e.target.value) / 100 })}
+            className="w-full accent-primary"
+          />
+        </Row>
+        <div className="grid gap-2">
+          <button
+            type="button"
+            onClick={() => onPatch({ showGrid: !state.showGrid })}
+            className="w-full rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {state.showGrid ? "Hide stage grid" : "Show stage grid"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onPatch({ xray: !state.xray })}
+            className={`w-full rounded-md border px-2 py-1.5 text-xs ${
+              state.xray
+                ? "border-primary bg-primary/10 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            X-ray outlines (X)
+          </button>
+          <button
+            type="button"
+            onClick={() => onPatch({ testPattern: !state.testPattern })}
+            className={`w-full rounded-md border px-2 py-1.5 text-xs ${
+              state.testPattern
+                ? "border-primary bg-primary/10 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Calibration test pattern
+          </button>
+        </div>
       </section>
+
     </aside>
   );
 }
