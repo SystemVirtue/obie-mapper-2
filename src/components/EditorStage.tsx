@@ -117,6 +117,10 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
     };
   };
 
+  if (!ready) {
+    return <div ref={wrapperRef} className="h-full w-full" />;
+  }
+
   return (
     <div ref={wrapperRef} className="flex h-full w-full items-center justify-center p-4">
       <div
