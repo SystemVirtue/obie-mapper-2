@@ -10,7 +10,13 @@ export const CHANNEL_NAME = "side-projection-suite";
 type Message =
   | { type: "state"; state: ProjectState }
   | { type: "request" }
-  | { type: "corners"; corners: CornerPin[]; gainLeft: number; gainRight: number };
+  | {
+      type: "corners";
+      corners: CornerPin[];
+      gainLeft: number;
+      gainRight: number;
+      brightness: number;
+    };
 
 function openChannel(): BroadcastChannel | null {
   if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return null;
@@ -46,6 +52,7 @@ export function useEditorBroadcast(
           corners: msg.corners,
           gainLeft: msg.gainLeft,
           gainRight: msg.gainRight,
+          brightness: msg.brightness,
         });
       }
     };
@@ -96,13 +103,14 @@ export function useProjectorMirror() {
   }, []);
 
   const pushCorners = useCallback(
-    (corners: CornerPin[], gainLeft: number, gainRight: number) => {
-      setState((prev) => ({ ...prev, corners, gainLeft, gainRight }));
+    (corners: CornerPin[], gainLeft: number, gainRight: number, brightness: number) => {
+      setState((prev) => ({ ...prev, corners, gainLeft, gainRight, brightness }));
       channelRef.current?.postMessage({
         type: "corners",
         corners,
         gainLeft,
         gainRight,
+        brightness,
       } satisfies Message);
     },
     [],
