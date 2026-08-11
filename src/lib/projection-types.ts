@@ -148,3 +148,15 @@ export function createNode(kind: NodeKind, index: number): ProjectionNode {
 export function newAssetId() {
   return nextId("asset");
 }
+
+/** Clone a node with a fresh id, nudged so it is visible on top of the original. */
+export function duplicateNode(node: ProjectionNode): ProjectionNode {
+  return {
+    ...node,
+    id: nextId(node.kind),
+    name: `${node.name} copy`,
+    x: node.x + 24,
+    y: node.y + 24,
+    points: [...node.points],
+  };
+}
