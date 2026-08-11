@@ -71,8 +71,9 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
     transformer.nodes(node ? [node] : []);
   }, [state.selectedId, state.nodes]);
 
-  const stageWidth = state.stageWidth * scale;
-  const stageHeight = state.stageHeight * scale;
+  const stageWidth = Math.max(1, Math.floor(state.stageWidth * scale));
+  const stageHeight = Math.max(1, Math.floor(state.stageHeight * scale));
+  const ready = size.width > 1 && size.height > 1;
 
   const commonHandlers = (node: ProjectionNode) => ({
     id: node.id,
@@ -108,13 +109,19 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
     if (!isReady(el) || !el) return { fill: node.color };
     const sw = el instanceof HTMLImageElement ? el.naturalWidth : el.videoWidth;
     const sh = el instanceof HTMLImageElement ? el.naturalHeight : el.videoHeight;
+    if (!sw || !sh) return { fill: node.color };
     const fit = Math.max(node.width / sw, node.height / sh);
+    if (!Number.isFinite(fit) || fit <= 0) return { fill: node.color };
     return {
       fillPatternImage: el as unknown as HTMLImageElement,
       fillPatternScale: { x: fit, y: fit },
       fillPatternRepeat: "no-repeat",
     };
   };
+
+  if (!ready) {
+    return <div ref={wrapperRef} className="h-full w-full" />;
+  }
 
   return (
     <div ref={wrapperRef} className="flex h-full w-full items-center justify-center p-4">
