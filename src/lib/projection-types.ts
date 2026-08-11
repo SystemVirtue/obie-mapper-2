@@ -6,6 +6,8 @@ export interface ProjectionNode {
   name: string;
   kind: NodeKind;
   visible: boolean;
+  /** Locked nodes cannot be dragged or transformed on the stage. */
+  locked: boolean;
   x: number;
   y: number;
   width: number;
@@ -22,6 +24,7 @@ export interface ProjectionNode {
   /** Trigger a pulse animation every N seconds (0 = off) */
   triggerSeconds: number;
 }
+
 
 export interface MediaAsset {
   id: string;
