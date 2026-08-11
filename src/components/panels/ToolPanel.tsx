@@ -1,4 +1,19 @@
-import { Image as ImageIcon, Eye, EyeOff, GripVertical, Layers, Music, Plus, Square, Trash2, Upload, Video } from "lucide-react";
+import {
+  Image as ImageIcon,
+  Copy,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Layers,
+  Lock,
+  Music,
+  Plus,
+  Square,
+  Trash2,
+  Unlock,
+  Upload,
+  Video,
+} from "lucide-react";
 import { useRef } from "react";
 
 import type { MediaAsset, NodeKind, ProjectionNode, ProjectState } from "@/lib/projection-types";
@@ -9,6 +24,7 @@ interface Props {
   onSelect: (id: string) => void;
   onUpdateNode: (id: string, patch: Partial<ProjectionNode>) => void;
   onDeleteNode: (id: string) => void;
+  onDuplicateNode: (id: string) => void;
   onReorder: (id: string, direction: -1 | 1) => void;
   onSetBackground: (url: string) => void;
   onPatchBackground: (patch: Partial<ProjectState["background"]>) => void;
@@ -27,6 +43,7 @@ export default function ToolPanel({
   onSelect,
   onUpdateNode,
   onDeleteNode,
+  onDuplicateNode,
   onReorder,
   onSetBackground,
   onPatchBackground,
@@ -36,7 +53,7 @@ export default function ToolPanel({
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-card/60 p-4">
+    <aside className="flex w-full flex-1 flex-col gap-5 bg-card/60 p-4">
       <section>
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Add node
@@ -183,6 +200,16 @@ export default function ToolPanel({
               </button>
               <button type="button" onClick={() => onReorder(node.id, -1)} title="Send backward">
                 ↓
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateNode(node.id, { locked: !node.locked })}
+                title={node.locked ? "Unlock" : "Lock"}
+              >
+                {node.locked ? <Lock className="size-3.5" /> : <Unlock className="size-3.5" />}
+              </button>
+              <button type="button" onClick={() => onDuplicateNode(node.id)} title="Duplicate">
+                <Copy className="size-3.5" />
               </button>
               <button
                 type="button"
