@@ -39,6 +39,8 @@ export interface CornerPin {
 }
 
 export interface ProjectState {
+  /** Scene name (matches the saved project record) */
+  name: string;
   /** Stage size in pixels (derived from wall meters + resolution) */
   stageWidth: number;
   stageHeight: number;
@@ -56,6 +58,12 @@ export interface ProjectState {
   gainLeft: number;
   gainRight: number;
   showGrid: boolean;
+  /** Global output brightness multiplier (0..2) */
+  brightness: number;
+  /** Outline-only alignment view */
+  xray: boolean;
+  /** Calibration test pattern overlay on the output */
+  testPattern: boolean;
 }
 
 export const DEFAULT_CORNERS: CornerPin[] = [
@@ -67,6 +75,7 @@ export const DEFAULT_CORNERS: CornerPin[] = [
 
 export function createDefaultState(): ProjectState {
   return {
+    name: "Untitled scene",
     stageWidth: 1280,
     stageHeight: 720,
     wallWidthM: 8,
@@ -81,8 +90,12 @@ export function createDefaultState(): ProjectState {
     gainLeft: 0.55,
     gainRight: 1,
     showGrid: true,
+    brightness: 1,
+    xray: false,
+    testPattern: false,
   };
 }
+
 
 let counter = 0;
 function nextId(prefix: string) {
