@@ -114,6 +114,8 @@ export function createNode(kind: NodeKind, index: number): ProjectionNode {
           : `Notes ${index + 1}`,
     kind,
     visible: true,
+    locked: false,
+
     x: 120 + index * 24,
     y: 120 + index * 18,
     width: 320,
