@@ -77,6 +77,35 @@ function pathForNode(ctx: CanvasRenderingContext2D, node: ProjectionNode) {
   }
 }
 
+function drawTestPattern(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const cell = Math.max(24, Math.round(Math.min(w, h) / 12));
+  for (let y = 0; y < h; y += cell) {
+    for (let x = 0; x < w; x += cell) {
+      const on = ((x / cell) | 0) % 2 === ((y / cell) | 0) % 2;
+      ctx.fillStyle = on ? "#1e293b" : "#0b1220";
+      ctx.fillRect(x, y, cell, cell);
+    }
+  }
+  ctx.strokeStyle = "#22d3ee";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, w - 2, h - 2);
+  ctx.beginPath();
+  ctx.moveTo(0, h / 2);
+  ctx.lineTo(w, h / 2);
+  ctx.moveTo(w / 2, 0);
+  ctx.lineTo(w / 2, h);
+  ctx.stroke();
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = `600 ${Math.round(cell / 2)}px system-ui, sans-serif`;
+  ctx.fillText("TL", 12, cell / 2 + 8);
+  ctx.textAlign = "right";
+  ctx.fillText("TR", w - 12, cell / 2 + 8);
+  ctx.fillText("BR", w - 12, h - 12);
+  ctx.textAlign = "left";
+  ctx.fillText("BL", 12, h - 12);
+  ctx.textAlign = "start";
+}
+
 /**
  * Draw the full projection scene (nodes only, black surround) into a 2D canvas.
  * This canvas becomes the WebGL source texture for the homography warp.
@@ -91,6 +120,12 @@ export function drawStage(
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, state.stageWidth, state.stageHeight);
 
+  if (state.testPattern) {
+    drawTestPattern(ctx, state.stageWidth, state.stageHeight);
+    ctx.restore();
+    return;
+  }
+
   for (const node of state.nodes) {
     if (!node.visible) continue;
     const scale = pulse(node, time);
@@ -101,6 +136,16 @@ export function drawStage(
     ctx.translate(node.width / 2, node.height / 2);
     ctx.scale(scale, scale);
     ctx.translate(-node.width / 2, -node.height / 2);
+
+    if (state.xray) {
+      // Alignment view: outlines only, no media.
+      pathForNode(ctx, node);
+      ctx.strokeStyle = "#22c55e";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
 
     if (node.glow) {
       ctx.shadowColor = node.color;
@@ -126,3 +171,4 @@ export function drawStage(
 
   ctx.restore();
 }
+

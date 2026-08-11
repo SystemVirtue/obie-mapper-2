@@ -67,7 +67,8 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
     const transformer = transformerRef.current;
     const layer = layerRef.current;
     if (!transformer || !layer) return;
-    const node = state.selectedId ? layer.findOne(`#${state.selectedId}`) : null;
+    const selected = state.nodes.find((n) => n.id === state.selectedId) ?? null;
+    const node = selected && !selected.locked ? layer.findOne(`#${state.selectedId}`) : null;
     transformer.nodes(node ? [node] : []);
   }, [state.selectedId, state.nodes]);
 
@@ -77,7 +78,7 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
 
   const commonHandlers = (node: ProjectionNode) => ({
     id: node.id,
-    draggable: true,
+    draggable: !node.locked,
     onClick: () => onSelect(node.id),
     onTap: () => onSelect(node.id),
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) =>
@@ -103,6 +104,7 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
   });
 
   const fillProps = (node: ProjectionNode) => {
+    if (state.xray) return { fill: "rgba(34,197,94,0.06)" };
     if (node.media === "color") return { fill: node.color };
     const asset = state.assets.find((a) => a.id === node.assetId) ?? null;
     const el = getMediaElement(asset);

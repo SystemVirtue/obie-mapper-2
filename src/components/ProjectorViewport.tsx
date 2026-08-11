@@ -25,6 +25,7 @@ const FRAG = /* glsl */ `
   uniform mat3 uInverseHomography;
   uniform float uGainLeft;
   uniform float uGainRight;
+  uniform float uBrightness;
 
   void main() {
     vec2 dest = vec2(vUv.x, 1.0 - vUv.y);
@@ -40,10 +41,11 @@ const FRAG = /* glsl */ `
     }
     vec4 color = texture2D(uTexture, uv);
     // Horizontal falloff compensation across the throw distance.
-    float gain = mix(uGainLeft, uGainRight, uv.x);
+    float gain = mix(uGainLeft, uGainRight, uv.x) * uBrightness;
     gl_FragColor = vec4(clamp(color.rgb * gain, 0.0, 1.0), 1.0);
   }
 `;
+
 
 interface Props {
   state: ProjectState;
@@ -110,7 +112,9 @@ export default function ProjectorViewport({ state, onCornersChange, showHandles 
       uInverseHomography: { value: new THREE.Matrix3().fromArray(toGlslMat3(inverseRef.current)) },
       uGainLeft: { value: stateRef.current.gainLeft },
       uGainRight: { value: stateRef.current.gainRight },
+      uBrightness: { value: stateRef.current.brightness },
     };
+
 
     let material: THREE.Material = new THREE.ShaderMaterial({
       vertexShader: VERT,
@@ -156,6 +160,8 @@ export default function ProjectorViewport({ state, onCornersChange, showHandles 
         uniforms.uInverseHomography.value.fromArray(toGlslMat3(inverseRef.current));
         uniforms.uGainLeft.value = s.gainLeft;
         uniforms.uGainRight.value = s.gainRight;
+        uniforms.uBrightness.value = Number.isFinite(s.brightness) ? s.brightness : 1;
+
       } else {
         // Warp the quad vertices with the corner pins instead of in the shader.
         const attr = geometry.attributes["position"] as THREE.BufferAttribute;
