@@ -104,7 +104,7 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
   });
 
   const fillProps = (node: ProjectionNode) => {
-    if (state.xray) return { fill: undefined };
+    if (state.xray) return { fill: "rgba(34,197,94,0.06)" };
     if (node.media === "color") return { fill: node.color };
     const asset = state.assets.find((a) => a.id === node.assetId) ?? null;
     const el = getMediaElement(asset);
