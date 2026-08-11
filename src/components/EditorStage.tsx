@@ -71,8 +71,9 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
     transformer.nodes(node ? [node] : []);
   }, [state.selectedId, state.nodes]);
 
-  const stageWidth = state.stageWidth * scale;
-  const stageHeight = state.stageHeight * scale;
+  const stageWidth = Math.max(1, Math.floor(state.stageWidth * scale));
+  const stageHeight = Math.max(1, Math.floor(state.stageHeight * scale));
+  const ready = size.width > 1 && size.height > 1;
 
   const commonHandlers = (node: ProjectionNode) => ({
     id: node.id,
