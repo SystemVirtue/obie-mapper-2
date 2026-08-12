@@ -171,6 +171,7 @@ function ProjectorPage() {
                 className="w-full accent-primary"
               />
             </label>
+            <OutputRecorder getCanvas={() => canvasRef.current} />
             <p className="text-muted-foreground">
               Drag the TL / TR / BR / BL handles onto the physical wall bounds.
             </p>
