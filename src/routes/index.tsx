@@ -135,13 +135,30 @@ function EditorPage() {
     [commit],
   );
 
-  const launchProjector = useCallback(() => {
-    const win = window.open(
-      "/projector",
-      "projector-output",
-      "width=1280,height=720,menubar=no,toolbar=no",
-    );
+  const launchProjector = useCallback(async () => {
+    const win = await openProjectorWindow();
     if (!win) setSplitView(true);
+  }, []);
+
+  // Auto-start the output window (fullscreen on a secondary display) on load.
+  useEffect(() => {
+    const enabled = getAutoStart();
+    setAutoStartState(enabled);
+    if (!enabled) return;
+    let cancelled = false;
+    void openProjectorWindow().then((win) => {
+      if (!cancelled && !win) setSplitView(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleAutoStart = useCallback(() => {
+    setAutoStartState((prev) => {
+      setAutoStart(!prev);
+      return !prev;
+    });
   }, []);
 
   // Global keyboard shortcuts (⌘S is handled inside ScenePanel).
