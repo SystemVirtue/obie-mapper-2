@@ -90,6 +90,19 @@ export default function StudioHeader({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <label
+          className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground"
+          title="On load, open the output window and fullscreen it on a secondary display when one is connected"
+        >
+          <input
+            type="checkbox"
+            checked={autoStart}
+            onChange={onToggleAutoStart}
+            className="size-3 accent-primary"
+          />
+          Auto-start output fullscreen
+        </label>
+
         <button
           type="button"
           onClick={onToggleSplit}
