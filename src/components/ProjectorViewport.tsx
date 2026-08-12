@@ -51,14 +51,23 @@ interface Props {
   state: ProjectState;
   onCornersChange?: (corners: CornerPin[]) => void;
   showHandles?: boolean;
+  /** Receives the live WebGL canvas (used for MP4 recording). */
+  onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 const LABELS = ["TL", "TR", "BR", "BL"];
 
-export default function ProjectorViewport({ state, onCornersChange, showHandles }: Props) {
+export default function ProjectorViewport({
+  state,
+  onCornersChange,
+  showHandles,
+  onCanvasReady,
+}: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const canvasReadyRef = useRef(onCanvasReady);
+  canvasReadyRef.current = onCanvasReady;
   const [fallback, setFallback] = useState(false);
   const [dragging, setDragging] = useState<number | null>(null);
 
