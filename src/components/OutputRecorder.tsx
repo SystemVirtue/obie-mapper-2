@@ -43,13 +43,6 @@ export default function OutputRecorder({ getCanvas, fps = 30 }: Props) {
     const mimeType = pickMimeType();
     try {
       const stream = canvas.captureStream(fps);
-      const recorder = new MediaRecorder(mimeType ? { mimeType } : undefined && stream, undefined);
-      void recorder;
-    } catch {
-      /* handled below with the explicit constructor */
-    }
-    try {
-      const stream = canvas.captureStream(fps);
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
