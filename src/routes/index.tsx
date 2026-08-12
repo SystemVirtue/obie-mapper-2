@@ -288,16 +288,21 @@ function EditorPage() {
 
           {splitView ? (
             <div className="h-2/5 min-h-[220px] border-t border-border">
-              <div className="flex items-center justify-between border-b border-border bg-card/60 px-3 py-1.5 text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-3 border-b border-border bg-card/60 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <span>Projector viewport (inline)</span>
-                <span>Drag TL/TR/BR/BL to corner-pin</span>
+                <div className="w-44">
+                  <OutputRecorder getCanvas={() => inlineCanvasRef.current} />
+                </div>
               </div>
-              <div className="h-[calc(100%-30px)]">
+              <div className="h-[calc(100%-34px)]">
                 <ClientOnly fallback={<StagePlaceholder label="Loading output…" />}>
                   <Suspense fallback={<StagePlaceholder label="Loading output…" />}>
                     <ProjectorViewport
                       state={state}
                       showHandles
+                      onCanvasReady={(canvas) => {
+                        inlineCanvasRef.current = canvas;
+                      }}
                       onCornersChange={(corners) => patch({ corners })}
                     />
                   </Suspense>
