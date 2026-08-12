@@ -51,14 +51,23 @@ interface Props {
   state: ProjectState;
   onCornersChange?: (corners: CornerPin[]) => void;
   showHandles?: boolean;
+  /** Receives the live WebGL canvas (used for MP4 recording). */
+  onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 const LABELS = ["TL", "TR", "BR", "BL"];
 
-export default function ProjectorViewport({ state, onCornersChange, showHandles }: Props) {
+export default function ProjectorViewport({
+  state,
+  onCornersChange,
+  showHandles,
+  onCanvasReady,
+}: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const canvasReadyRef = useRef(onCanvasReady);
+  canvasReadyRef.current = onCanvasReady;
   const [fallback, setFallback] = useState(false);
   const [dragging, setDragging] = useState<number | null>(null);
 
@@ -91,7 +100,11 @@ export default function ProjectorViewport({ state, onCornersChange, showHandles 
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+        preserveDrawingBuffer: true,
+      });
     } catch {
       setFallback(true);
       return;
@@ -102,6 +115,7 @@ export default function ProjectorViewport({ state, onCornersChange, showHandles 
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
     renderer.domElement.style.display = "block";
+    canvasReadyRef.current?.(renderer.domElement);
 
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -185,6 +199,7 @@ export default function ProjectorViewport({ state, onCornersChange, showHandles 
       texture.dispose();
       renderer.dispose();
       renderer.domElement.remove();
+      canvasReadyRef.current?.(null);
     };
   }, []);
 

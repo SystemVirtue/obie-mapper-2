@@ -1,11 +1,13 @@
 import { ClientOnly, createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Redo2, Undo2 } from "lucide-react";
 
+import OutputRecorder from "@/components/OutputRecorder";
 import InspectorPanel from "@/components/panels/InspectorPanel";
 import ScenePanel from "@/components/panels/ScenePanel";
 import StudioHeader from "@/components/panels/StudioHeader";
 import ToolPanel from "@/components/panels/ToolPanel";
+import { getAutoStart, openProjectorWindow, setAutoStart } from "@/lib/output-window";
 import { newProjectId } from "@/lib/project-store";
 import { useEditorBroadcast } from "@/lib/projection-channel";
 import {
@@ -54,6 +56,8 @@ function EditorPage() {
     useHistory<ProjectState>(() => createDefaultState());
   const [splitView, setSplitView] = useState(false);
   const [projectId, setProjectId] = useState(() => newProjectId());
+  const [autoStart, setAutoStartState] = useState(false);
+  const inlineCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const patch = useCallback(
     (partial: Partial<ProjectState>) => {
@@ -131,13 +135,30 @@ function EditorPage() {
     [commit],
   );
 
-  const launchProjector = useCallback(() => {
-    const win = window.open(
-      "/projector",
-      "projector-output",
-      "width=1280,height=720,menubar=no,toolbar=no",
-    );
+  const launchProjector = useCallback(async () => {
+    const win = await openProjectorWindow();
     if (!win) setSplitView(true);
+  }, []);
+
+  // Auto-start the output window (fullscreen on a secondary display) on load.
+  useEffect(() => {
+    const enabled = getAutoStart();
+    setAutoStartState(enabled);
+    if (!enabled) return;
+    let cancelled = false;
+    void openProjectorWindow().then((win) => {
+      if (!cancelled && !win) setSplitView(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleAutoStart = useCallback(() => {
+    setAutoStartState((prev) => {
+      setAutoStart(!prev);
+      return !prev;
+    });
   }, []);
 
   // Global keyboard shortcuts (⌘S is handled inside ScenePanel).
@@ -183,10 +204,12 @@ function EditorPage() {
       <StudioHeader
         state={state}
         onPatch={patch}
-        onLaunch={launchProjector}
+        onLaunch={() => void launchProjector()}
         splitView={splitView}
         onToggleSplit={() => setSplitView((v) => !v)}
         channelSupported={supported}
+        autoStart={autoStart}
+        onToggleAutoStart={toggleAutoStart}
       />
 
       {!supported ? (
@@ -265,16 +288,21 @@ function EditorPage() {
 
           {splitView ? (
             <div className="h-2/5 min-h-[220px] border-t border-border">
-              <div className="flex items-center justify-between border-b border-border bg-card/60 px-3 py-1.5 text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-3 border-b border-border bg-card/60 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <span>Projector viewport (inline)</span>
-                <span>Drag TL/TR/BR/BL to corner-pin</span>
+                <div className="w-44">
+                  <OutputRecorder getCanvas={() => inlineCanvasRef.current} />
+                </div>
               </div>
-              <div className="h-[calc(100%-30px)]">
+              <div className="h-[calc(100%-34px)]">
                 <ClientOnly fallback={<StagePlaceholder label="Loading output…" />}>
                   <Suspense fallback={<StagePlaceholder label="Loading output…" />}>
                     <ProjectorViewport
                       state={state}
                       showHandles
+                      onCanvasReady={(canvas) => {
+                        inlineCanvasRef.current = canvas;
+                      }}
                       onCornersChange={(corners) => patch({ corners })}
                     />
                   </Suspense>

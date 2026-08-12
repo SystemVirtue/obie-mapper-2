@@ -2,6 +2,7 @@ import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2 } from "lucide-react";
 
+import OutputRecorder from "@/components/OutputRecorder";
 import { useProjectorMirror } from "@/lib/projection-channel";
 
 const ProjectorViewport = lazy(() => import("@/components/ProjectorViewport"));
@@ -29,12 +30,25 @@ function ProjectorPage() {
   const { state, connected, pushCorners } = useProjectorMirror();
   const [showControls, setShowControls] = useState(true);
   const shellRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const toggleFullscreen = useCallback(() => {
     const el = shellRef.current;
     if (!el) return;
     if (document.fullscreenElement) void document.exitFullscreen();
     else void el.requestFullscreen?.().catch(() => undefined);
+  }, []);
+
+  // Auto-fullscreen when launched with ?fullscreen=1 (secondary display startup).
+  const [needsGesture, setNeedsGesture] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!new URLSearchParams(window.location.search).has("fullscreen")) return;
+    const el = shellRef.current;
+    if (!el) return;
+    el.requestFullscreen?.()
+      .then(() => setShowControls(false))
+      .catch(() => setNeedsGesture(true));
   }, []);
 
   useEffect(() => {
@@ -53,12 +67,28 @@ function ProjectorPage() {
           <ProjectorViewport
             state={state}
             showHandles={showControls}
+            onCanvasReady={(canvas) => {
+              canvasRef.current = canvas;
+            }}
             onCornersChange={(corners) =>
               pushCorners(corners, state.gainLeft, state.gainRight, state.brightness)
             }
           />
         </Suspense>
       </ClientOnly>
+
+      {needsGesture ? (
+        <button
+          type="button"
+          onClick={() => {
+            setNeedsGesture(false);
+            toggleFullscreen();
+          }}
+          className="absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 rounded-md bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground"
+        >
+          Click to go fullscreen on this display
+        </button>
+      ) : null}
 
       <div className="absolute right-3 top-3 z-20 flex flex-col items-end gap-2">
         <div className="flex gap-2">
@@ -141,6 +171,7 @@ function ProjectorPage() {
                 className="w-full accent-primary"
               />
             </label>
+            <OutputRecorder getCanvas={() => canvasRef.current} />
             <p className="text-muted-foreground">
               Drag the TL / TR / BR / BL handles onto the physical wall bounds.
             </p>
