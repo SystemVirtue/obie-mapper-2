@@ -204,10 +204,12 @@ function EditorPage() {
       <StudioHeader
         state={state}
         onPatch={patch}
-        onLaunch={launchProjector}
+        onLaunch={() => void launchProjector()}
         splitView={splitView}
         onToggleSplit={() => setSplitView((v) => !v)}
         channelSupported={supported}
+        autoStart={autoStart}
+        onToggleAutoStart={toggleAutoStart}
       />
 
       {!supported ? (
