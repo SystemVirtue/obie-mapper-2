@@ -56,6 +56,8 @@ function EditorPage() {
     useHistory<ProjectState>(() => createDefaultState());
   const [splitView, setSplitView] = useState(false);
   const [projectId, setProjectId] = useState(() => newProjectId());
+  const [autoStart, setAutoStartState] = useState(false);
+  const inlineCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const patch = useCallback(
     (partial: Partial<ProjectState>) => {
