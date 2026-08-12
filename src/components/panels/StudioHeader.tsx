@@ -9,6 +9,8 @@ interface Props {
   splitView: boolean;
   onToggleSplit: () => void;
   channelSupported: boolean;
+  autoStart: boolean;
+  onToggleAutoStart: () => void;
 }
 
 const numberClass =
@@ -21,6 +23,8 @@ export default function StudioHeader({
   splitView,
   onToggleSplit,
   channelSupported,
+  autoStart,
+  onToggleAutoStart,
 }: Props) {
   const setResolution = (width: number, height: number) => {
     onPatch({
