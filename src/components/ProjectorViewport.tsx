@@ -199,6 +199,7 @@ export default function ProjectorViewport({
       texture.dispose();
       renderer.dispose();
       renderer.domElement.remove();
+      canvasReadyRef.current?.(null);
     };
   }, []);
 
