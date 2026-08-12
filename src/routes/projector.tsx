@@ -2,6 +2,7 @@ import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2 } from "lucide-react";
 
+import OutputRecorder from "@/components/OutputRecorder";
 import { useProjectorMirror } from "@/lib/projection-channel";
 
 const ProjectorViewport = lazy(() => import("@/components/ProjectorViewport"));
