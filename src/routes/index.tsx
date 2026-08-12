@@ -1,11 +1,13 @@
 import { ClientOnly, createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Redo2, Undo2 } from "lucide-react";
 
+import OutputRecorder from "@/components/OutputRecorder";
 import InspectorPanel from "@/components/panels/InspectorPanel";
 import ScenePanel from "@/components/panels/ScenePanel";
 import StudioHeader from "@/components/panels/StudioHeader";
 import ToolPanel from "@/components/panels/ToolPanel";
+import { getAutoStart, openProjectorWindow, setAutoStart } from "@/lib/output-window";
 import { newProjectId } from "@/lib/project-store";
 import { useEditorBroadcast } from "@/lib/projection-channel";
 import {
