@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectorRouteImport } from './routes/projector'
+import { Route as PTokenRouteImport } from './routes/p.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ProjectorRoute = ProjectorRouteImport.update({
   path: '/projector',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PTokenRoute = PTokenRouteImport.update({
+  id: '/p/$token',
+  path: '/p/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/projector': typeof ProjectorRoute
+  '/p/$token': typeof PTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/projector': typeof ProjectorRoute
+  '/p/$token': typeof PTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/projector': typeof ProjectorRoute
+  '/p/$token': typeof PTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/projector'
+  fullPaths: '/' | '/projector' | '/p/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/projector'
-  id: '__root__' | '/' | '/projector'
+  to: '/' | '/projector' | '/p/$token'
+  id: '__root__' | '/' | '/projector' | '/p/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ProjectorRoute: typeof ProjectorRoute
+  PTokenRoute: typeof PTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$token': {
+      id: '/p/$token'
+      path: '/p/$token'
+      fullPath: '/p/$token'
+      preLoaderRoute: typeof PTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ProjectorRoute: ProjectorRoute,
+  PTokenRoute: PTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
