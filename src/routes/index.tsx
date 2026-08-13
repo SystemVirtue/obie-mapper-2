@@ -234,6 +234,9 @@ function EditorPage() {
               reset(createDefaultState());
             }}
           />
+          <ClientOnly fallback={null}>
+            <RemoteProjectorPanel state={state} />
+          </ClientOnly>
           <ToolPanel
             state={state}
             onAddNode={addNode}
