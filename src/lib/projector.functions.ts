@@ -8,9 +8,12 @@ const tokenSchema = z
   .max(64)
   .regex(/^[A-Za-z0-9_-]+$/);
 
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+export type SceneJson = { [key: string]: Json };
+
 const publishSchema = z.object({
   token: tokenSchema,
-  scene: z.record(z.string(), z.unknown()),
+  scene: z.record(z.string(), z.any()).transform((v) => v as SceneJson),
   enabled: z.boolean().optional(),
   paused: z.boolean().optional(),
   label: z.string().trim().max(80).optional(),
@@ -39,7 +42,7 @@ export type ProjectorStatus =
 export interface ProjectorSnapshot {
   status: ProjectorStatus;
   revision: number;
-  scene: Record<string, unknown> | null;
+  scene: SceneJson | null;
   updatedAt: string | null;
   label: string | null;
 }
@@ -75,7 +78,7 @@ export const publishProjectorScene = createServerFn({ method: "POST" })
 
     const payload = {
       token: data.token,
-      scene: data.scene,
+      scene: data.scene as never,
       enabled: data.enabled ?? true,
       paused: data.paused ?? false,
       revision: (existing?.revision ?? 0) + 1,
@@ -130,7 +133,7 @@ export const getProjectorScene = createServerFn({ method: "POST" })
       return { ...base, status: status === "live" ? "unchanged" : status, scene: null };
     }
 
-    const scene = (row.scene as Record<string, unknown> | null) ?? null;
+    const scene = (row.scene as SceneJson | null) ?? null;
     if (scene) await signSceneAssets(scene, supabaseAdmin);
     return { ...base, status, scene };
   });
@@ -156,7 +159,7 @@ type AdminClient = Awaited<
 >["supabaseAdmin"];
 
 /** Replace `storage:<path>` references in a published scene with signed URLs. */
-async function signSceneAssets(scene: Record<string, unknown>, admin: AdminClient) {
+async function signSceneAssets(scene: SceneJson, admin: AdminClient) {
   const assets = scene["assets"];
   const paths: string[] = [];
   const collect = (value: unknown) => {
@@ -165,7 +168,7 @@ async function signSceneAssets(scene: Record<string, unknown>, admin: AdminClien
   if (Array.isArray(assets)) {
     for (const asset of assets) collect((asset as { url?: unknown } | null)?.url);
   }
-  const background = scene["background"] as { url?: unknown } | null | undefined;
+  const background = scene["background"] as { url?: Json } | null | undefined;
   collect(background?.url);
   if (paths.length === 0) return;
 
@@ -184,9 +187,9 @@ async function signSceneAssets(scene: Record<string, unknown>, admin: AdminClien
 
   if (Array.isArray(assets)) {
     for (const asset of assets) {
-      const record = asset as { url?: unknown };
-      if (record) record.url = resolve(record.url);
+      const record = asset as { url?: Json };
+      if (record) record.url = resolve(record.url) as Json;
     }
   }
-  if (background) background.url = resolve(background.url);
+  if (background) background.url = resolve(background.url) as Json;
 }
