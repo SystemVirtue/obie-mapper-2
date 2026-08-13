@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      projector_channels: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          label: string
+          owner_id: string | null
+          paused: boolean
+          revision: number
+          scene: Json | null
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          owner_id?: string | null
+          paused?: boolean
+          revision?: number
+          scene?: Json | null
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          owner_id?: string | null
+          paused?: boolean
+          revision?: number
+          scene?: Json | null
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
