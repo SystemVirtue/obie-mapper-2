@@ -4,6 +4,7 @@ import { AlertTriangle, Redo2, Undo2 } from "lucide-react";
 
 import OutputRecorder from "@/components/OutputRecorder";
 import InspectorPanel from "@/components/panels/InspectorPanel";
+import RemoteProjectorPanel from "@/components/panels/RemoteProjectorPanel";
 import ScenePanel from "@/components/panels/ScenePanel";
 import StudioHeader from "@/components/panels/StudioHeader";
 import ToolPanel from "@/components/panels/ToolPanel";
@@ -233,6 +234,9 @@ function EditorPage() {
               reset(createDefaultState());
             }}
           />
+          <ClientOnly fallback={null}>
+            <RemoteProjectorPanel state={state} />
+          </ClientOnly>
           <ToolPanel
             state={state}
             onAddNode={addNode}
