@@ -109,6 +109,24 @@ function nextId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${counter}`;
 }
 
+export const MIN_POLYGON_SIDES = 3;
+export const MAX_POLYGON_SIDES = 12;
+export const DEFAULT_POLYGON_SIDES = 4;
+
+/** Regular polygon vertices inscribed in a width x height box, first point at top. */
+export function polygonPoints(sides: number, width: number, height: number): number[] {
+  const n = Math.max(MIN_POLYGON_SIDES, Math.min(MAX_POLYGON_SIDES, Math.round(sides)));
+  const rx = width / 2;
+  const ry = height / 2;
+  const start = -Math.PI / 2 + (n % 2 === 0 ? Math.PI / n : 0);
+  const pts: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = start + (i * Math.PI * 2) / n;
+    pts.push(rx + rx * Math.cos(a), ry + ry * Math.sin(a));
+  }
+  return pts;
+}
+
 export function createNode(kind: NodeKind, index: number): ProjectionNode {
   const base: ProjectionNode = {
     id: nextId(kind),
