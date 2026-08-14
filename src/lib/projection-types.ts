@@ -15,6 +15,12 @@ export interface ProjectionNode {
   rotation: number;
   /** Local points (relative to x/y) for polygon nodes: [x0,y0,x1,y1,...] */
   points: number[];
+  /** Number of polygon vertices (3..12) */
+  sides: number;
+  /** Spline smoothing amount 0..1 (0 = straight edges, higher = bezier curves) */
+  tension: number;
+  /** Rounded corner radius in stage px (rect nodes and polygon vertices) */
+  cornerRadius: number;
   media: MediaKind;
   color: string;
   assetId: string | null;
