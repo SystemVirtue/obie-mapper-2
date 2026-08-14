@@ -104,16 +104,16 @@ function pathForNode(ctx: CanvasRenderingContext2D, node: ProjectionNode) {
     for (let i = 0; i < node.points.length; i += 2) {
       pts.push({ x: node.points[i] ?? 0, y: node.points[i + 1] ?? 0 });
     }
-    if (node.tension > 0.02) {
+    if ((node.tension ?? 0) > 0.02) {
       smoothClosedPath(ctx, pts);
-    } else if (node.cornerRadius > 0.5) {
-      roundedClosedPath(ctx, pts, node.cornerRadius);
+    } else if ((node.cornerRadius ?? 0) > 0.5) {
+      roundedClosedPath(ctx, pts, node.cornerRadius ?? 0);
     } else {
       pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
       ctx.closePath();
     }
-  } else if (node.cornerRadius > 0.5) {
-    const r = Math.min(node.cornerRadius, node.width / 2, node.height / 2);
+  } else if ((node.cornerRadius ?? 0) > 0.5) {
+    const r = Math.min(node.cornerRadius ?? 0, node.width / 2, node.height / 2);
     ctx.roundRect(0, 0, node.width, node.height, r);
   } else {
     ctx.rect(0, 0, node.width, node.height);
