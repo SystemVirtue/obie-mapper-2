@@ -159,9 +159,9 @@ export function createNode(kind: NodeKind, index: number): ProjectionNode {
   };
 
   if (kind === "polygon") {
-    base.points = [0, 0, 300, 40, 260, 220, 30, 180];
     base.width = 300;
     base.height = 220;
+    base.points = polygonPoints(DEFAULT_POLYGON_SIDES, 300, 220);
     base.color = "#a78bfa";
   }
   if (kind === "particles") {
