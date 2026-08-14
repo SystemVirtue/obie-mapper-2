@@ -62,16 +62,59 @@ function drawMediaFill(
   ctx.restore();
 }
 
+function smoothClosedPath(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+) {
+  const n = pts.length;
+  const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  });
+  const start = mid(pts[n - 1]!, pts[0]!);
+  ctx.moveTo(start.x, start.y);
+  for (let i = 0; i < n; i += 1) {
+    const cur = pts[i]!;
+    const next = pts[(i + 1) % n]!;
+    const end = mid(cur, next);
+    ctx.quadraticCurveTo(cur.x, cur.y, end.x, end.y);
+  }
+  ctx.closePath();
+}
+
+function roundedClosedPath(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+  radius: number,
+) {
+  const n = pts.length;
+  ctx.moveTo((pts[0]!.x + pts[1]!.x) / 2, (pts[0]!.y + pts[1]!.y) / 2);
+  for (let i = 0; i < n; i += 1) {
+    const cur = pts[(i + 1) % n]!;
+    const next = pts[(i + 2) % n]!;
+    ctx.arcTo(cur.x, cur.y, next.x, next.y, radius);
+  }
+  ctx.closePath();
+}
+
 function pathForNode(ctx: CanvasRenderingContext2D, node: ProjectionNode) {
   ctx.beginPath();
   if (node.kind === "polygon" && node.points.length >= 6) {
+    const pts: { x: number; y: number }[] = [];
     for (let i = 0; i < node.points.length; i += 2) {
-      const px = node.points[i] ?? 0;
-      const py = node.points[i + 1] ?? 0;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+      pts.push({ x: node.points[i] ?? 0, y: node.points[i + 1] ?? 0 });
     }
-    ctx.closePath();
+    if (node.tension > 0.02) {
+      smoothClosedPath(ctx, pts);
+    } else if (node.cornerRadius > 0.5) {
+      roundedClosedPath(ctx, pts, node.cornerRadius);
+    } else {
+      pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.closePath();
+    }
+  } else if (node.cornerRadius > 0.5) {
+    const r = Math.min(node.cornerRadius, node.width / 2, node.height / 2);
+    ctx.roundRect(0, 0, node.width, node.height, r);
   } else {
     ctx.rect(0, 0, node.width, node.height);
   }
