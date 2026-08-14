@@ -83,6 +83,58 @@ export default function InspectorPanel({ state, onUpdateNode, onPatch }: Props) 
               />
             </Row>
 
+            {node.kind === "polygon" ? (
+              <Row label={`Points ${node.sides}`}>
+                <input
+                  type="range"
+                  min={MIN_POLYGON_SIDES}
+                  max={MAX_POLYGON_SIDES}
+                  step={1}
+                  value={node.sides}
+                  onChange={(e) => {
+                    const sides = Number(e.target.value);
+                    onUpdateNode(node.id, {
+                      sides,
+                      points: polygonPoints(sides, node.width, node.height),
+                    });
+                  }}
+                  className="w-full accent-primary"
+                />
+              </Row>
+            ) : null}
+
+            <div className="space-y-2 rounded-md border border-border/70 p-3">
+              <label className="flex items-center justify-between text-xs text-foreground">
+                Smooth edges (spline)
+                <input
+                  type="checkbox"
+                  checked={node.tension > 0.02}
+                  onChange={(e) => onUpdateNode(node.id, { tension: e.target.checked ? 0.5 : 0 })}
+                  className="accent-primary"
+                />
+              </label>
+              <Row label={`Curve amount ${Math.round(node.tension * 100)}%`}>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(node.tension * 100)}
+                  onChange={(e) => onUpdateNode(node.id, { tension: Number(e.target.value) / 100 })}
+                  className="w-full accent-primary"
+                />
+              </Row>
+              <Row label={`Corner radius ${Math.round(node.cornerRadius)}px`}>
+                <input
+                  type="range"
+                  min={0}
+                  max={200}
+                  value={Math.round(node.cornerRadius)}
+                  onChange={(e) => onUpdateNode(node.id, { cornerRadius: Number(e.target.value) })}
+                  className="w-full accent-primary"
+                />
+              </Row>
+            </div>
+
             <Row label="Media source">
               <select
                 className={inputClass}
