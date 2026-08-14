@@ -181,6 +181,8 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
                     opacity={node.opacity}
                     points={node.points}
                     closed
+                    tension={node.tension ?? 0}
+                    lineJoin="round"
                     stroke={state.selectedId === node.id ? "#38bdf8" : "rgba(148,163,184,0.6)"}
                     strokeWidth={2 / scale}
                     shadowColor={node.glow ? node.color : "transparent"}
@@ -219,6 +221,7 @@ export default function EditorStage({ state, onSelect, onUpdateNode }: Props) {
                   height={node.height}
                   rotation={node.rotation}
                   opacity={node.opacity}
+                  cornerRadius={node.cornerRadius ?? 0}
                   stroke={state.selectedId === node.id ? "#38bdf8" : "rgba(148,163,184,0.6)"}
                   strokeWidth={2 / scale}
                   shadowColor={node.glow ? node.color : "transparent"}

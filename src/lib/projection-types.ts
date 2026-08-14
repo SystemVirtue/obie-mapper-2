@@ -15,6 +15,12 @@ export interface ProjectionNode {
   rotation: number;
   /** Local points (relative to x/y) for polygon nodes: [x0,y0,x1,y1,...] */
   points: number[];
+  /** Number of polygon vertices (3..12) */
+  sides: number;
+  /** Spline smoothing amount 0..1 (0 = straight edges, higher = bezier curves) */
+  tension: number;
+  /** Rounded corner radius in stage px (rect nodes and polygon vertices) */
+  cornerRadius: number;
   media: MediaKind;
   color: string;
   assetId: string | null;
@@ -103,6 +109,24 @@ function nextId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${counter}`;
 }
 
+export const MIN_POLYGON_SIDES = 3;
+export const MAX_POLYGON_SIDES = 12;
+export const DEFAULT_POLYGON_SIDES = 4;
+
+/** Regular polygon vertices inscribed in a width x height box, first point at top. */
+export function polygonPoints(sides: number, width: number, height: number): number[] {
+  const n = Math.max(MIN_POLYGON_SIDES, Math.min(MAX_POLYGON_SIDES, Math.round(sides)));
+  const rx = width / 2;
+  const ry = height / 2;
+  const start = -Math.PI / 2 + (n % 2 === 0 ? Math.PI / n : 0);
+  const pts: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = start + (i * Math.PI * 2) / n;
+    pts.push(rx + rx * Math.cos(a), ry + ry * Math.sin(a));
+  }
+  return pts;
+}
+
 export function createNode(kind: NodeKind, index: number): ProjectionNode {
   const base: ProjectionNode = {
     id: nextId(kind),
@@ -122,6 +146,9 @@ export function createNode(kind: NodeKind, index: number): ProjectionNode {
     height: 200,
     rotation: 0,
     points: [],
+    sides: DEFAULT_POLYGON_SIDES,
+    tension: 0,
+    cornerRadius: 0,
     media: "color",
     color: "#5eead4",
     assetId: null,
@@ -132,9 +159,9 @@ export function createNode(kind: NodeKind, index: number): ProjectionNode {
   };
 
   if (kind === "polygon") {
-    base.points = [0, 0, 300, 40, 260, 220, 30, 180];
     base.width = 300;
     base.height = 220;
+    base.points = polygonPoints(DEFAULT_POLYGON_SIDES, 300, 220);
     base.color = "#a78bfa";
   }
   if (kind === "particles") {
