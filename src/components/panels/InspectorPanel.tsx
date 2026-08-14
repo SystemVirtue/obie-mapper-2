@@ -1,4 +1,10 @@
-import type { ProjectionNode, ProjectState } from "@/lib/projection-types";
+import {
+  MAX_POLYGON_SIDES,
+  MIN_POLYGON_SIDES,
+  polygonPoints,
+  type ProjectionNode,
+  type ProjectState,
+} from "@/lib/projection-types";
 
 interface Props {
   state: ProjectState;
