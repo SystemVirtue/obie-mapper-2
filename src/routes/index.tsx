@@ -41,8 +41,18 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: EditorPage,
+  component: StudioPage,
 });
+
+function StudioPage() {
+  return (
+    <ClientOnly fallback={<div className="h-screen w-screen bg-background" />}>
+      <StudioGate>
+        <EditorPage />
+      </StudioGate>
+    </ClientOnly>
+  );
+}
 
 function StagePlaceholder({ label }: { label: string }) {
   return (
