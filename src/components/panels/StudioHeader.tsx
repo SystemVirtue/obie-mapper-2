@@ -1,4 +1,4 @@
-import { MonitorPlay, Ruler, SplitSquareHorizontal } from "lucide-react";
+import { Lock, MonitorPlay, Ruler, SplitSquareHorizontal } from "lucide-react";
 
 import type { ProjectState } from "@/lib/projection-types";
 
