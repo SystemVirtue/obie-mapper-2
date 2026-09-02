@@ -24,10 +24,19 @@ const readSchema = z.object({
   sinceRevision: z.number().int().nonnegative().optional(),
 });
 
+/** Only projectable media may be uploaded — the bucket is not general storage. */
+const ALLOWED_MEDIA = /^(image\/(png|jpeg|webp|gif|avif)|video\/(mp4|webm|quicktime))$/;
+
 const uploadSchema = z.object({
   token: tokenSchema,
   fileName: z.string().trim().min(1).max(200),
-  contentType: z.string().trim().min(3).max(120),
+  contentType: z
+    .string()
+    .trim()
+    .min(3)
+    .max(120)
+    .transform((value) => value.split(";")[0]!.trim().toLowerCase())
+    .refine((value) => ALLOWED_MEDIA.test(value), "Unsupported media type"),
 });
 
 export type ProjectorStatus =
