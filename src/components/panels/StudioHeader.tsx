@@ -1,4 +1,4 @@
-import { MonitorPlay, Ruler, SplitSquareHorizontal } from "lucide-react";
+import { Lock, MonitorPlay, Ruler, SplitSquareHorizontal } from "lucide-react";
 
 import type { ProjectState } from "@/lib/projection-types";
 
@@ -11,6 +11,7 @@ interface Props {
   channelSupported: boolean;
   autoStart: boolean;
   onToggleAutoStart: () => void;
+  onLock: () => void;
 }
 
 const numberClass =
@@ -25,6 +26,7 @@ export default function StudioHeader({
   channelSupported,
   autoStart,
   onToggleAutoStart,
+  onLock,
 }: Props) {
   const setResolution = (width: number, height: number) => {
     onPatch({
@@ -120,6 +122,15 @@ export default function StudioHeader({
         >
           <MonitorPlay className="size-4" />
           Launch projector window
+        </button>
+        <button
+          type="button"
+          onClick={onLock}
+          title="Forget this device — the studio password will be required again"
+          className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+        >
+          <Lock className="size-3.5" />
+          Lock
         </button>
       </div>
     </header>

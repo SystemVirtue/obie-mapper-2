@@ -6,6 +6,8 @@ import OutputRecorder from "@/components/OutputRecorder";
 import InspectorPanel from "@/components/panels/InspectorPanel";
 import RemoteProjectorPanel from "@/components/panels/RemoteProjectorPanel";
 import ScenePanel from "@/components/panels/ScenePanel";
+import StudioGate, { clearStudioUnlockFlag } from "@/components/StudioGate";
+import { lockStudio } from "@/lib/gate.functions";
 import StudioHeader from "@/components/panels/StudioHeader";
 import ToolPanel from "@/components/panels/ToolPanel";
 import { getAutoStart, openProjectorWindow, setAutoStart } from "@/lib/output-window";
@@ -41,8 +43,18 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: EditorPage,
+  component: StudioPage,
 });
+
+function StudioPage() {
+  return (
+    <ClientOnly fallback={<div className="h-screen w-screen bg-background" />}>
+      <StudioGate>
+        <EditorPage />
+      </StudioGate>
+    </ClientOnly>
+  );
+}
 
 function StagePlaceholder({ label }: { label: string }) {
   return (
@@ -211,6 +223,10 @@ function EditorPage() {
         channelSupported={supported}
         autoStart={autoStart}
         onToggleAutoStart={toggleAutoStart}
+        onLock={() => {
+          clearStudioUnlockFlag();
+          void lockStudio().finally(() => window.location.reload());
+        }}
       />
 
       {!supported ? (
