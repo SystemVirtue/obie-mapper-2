@@ -223,6 +223,10 @@ function EditorPage() {
         channelSupported={supported}
         autoStart={autoStart}
         onToggleAutoStart={toggleAutoStart}
+        onLock={() => {
+          clearStudioUnlockFlag();
+          void lockStudio().finally(() => window.location.reload());
+        }}
       />
 
       {!supported ? (
