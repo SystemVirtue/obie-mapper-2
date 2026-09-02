@@ -73,7 +73,7 @@ export const createProjectorChannel = createServerFn({ method: "POST" }).handler
   return { token };
 });
 
-/** Publish the current scene snapshot to a channel (creates it when missing). */
+/** Publish the current scene snapshot to an existing channel. */
 export const publishProjectorScene = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => publishSchema.parse(data))
   .handler(async ({ data }) => {
@@ -85,26 +85,24 @@ export const publishProjectorScene = createServerFn({ method: "POST" })
       .eq("token", data.token)
       .maybeSingle();
 
+    // Only codes minted by createProjectorChannel may be published to, so a
+    // caller cannot conjure channels (and their storage prefix) at will.
+    if (!existing) throw new Error("Unknown projector code");
+
     const payload = {
-      token: data.token,
       scene: data.scene as never,
       enabled: data.enabled ?? true,
       paused: data.paused ?? false,
-      revision: (existing?.revision ?? 0) + 1,
+      revision: existing.revision + 1,
       updated_at: new Date().toISOString(),
       ...(data.label ? { label: data.label } : {}),
     };
 
-    if (existing) {
-      const { error } = await supabaseAdmin
-        .from("projector_channels")
-        .update(payload)
-        .eq("id", existing.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await supabaseAdmin.from("projector_channels").insert(payload);
-      if (error) throw new Error(error.message);
-    }
+    const { error } = await supabaseAdmin
+      .from("projector_channels")
+      .update(payload)
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
 
     return { revision: payload.revision, updatedAt: payload.updated_at };
   });
