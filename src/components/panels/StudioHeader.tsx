@@ -11,6 +11,7 @@ interface Props {
   channelSupported: boolean;
   autoStart: boolean;
   onToggleAutoStart: () => void;
+  onLock: () => void;
 }
 
 const numberClass =
