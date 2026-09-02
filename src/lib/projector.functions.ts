@@ -24,10 +24,19 @@ const readSchema = z.object({
   sinceRevision: z.number().int().nonnegative().optional(),
 });
 
+/** Only projectable media may be uploaded — the bucket is not general storage. */
+const ALLOWED_MEDIA = /^(image\/(png|jpeg|webp|gif|avif)|video\/(mp4|webm|quicktime))$/;
+
 const uploadSchema = z.object({
   token: tokenSchema,
   fileName: z.string().trim().min(1).max(200),
-  contentType: z.string().trim().min(3).max(120),
+  contentType: z
+    .string()
+    .trim()
+    .min(3)
+    .max(120)
+    .transform((value) => value.split(";")[0]!.trim().toLowerCase())
+    .refine((value) => ALLOWED_MEDIA.test(value), "Unsupported media type"),
 });
 
 export type ProjectorStatus =
@@ -64,7 +73,7 @@ export const createProjectorChannel = createServerFn({ method: "POST" }).handler
   return { token };
 });
 
-/** Publish the current scene snapshot to a channel (creates it when missing). */
+/** Publish the current scene snapshot to an existing channel. */
 export const publishProjectorScene = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => publishSchema.parse(data))
   .handler(async ({ data }) => {
@@ -76,26 +85,24 @@ export const publishProjectorScene = createServerFn({ method: "POST" })
       .eq("token", data.token)
       .maybeSingle();
 
+    // Only codes minted by createProjectorChannel may be published to, so a
+    // caller cannot conjure channels (and their storage prefix) at will.
+    if (!existing) throw new Error("Unknown projector code");
+
     const payload = {
-      token: data.token,
       scene: data.scene as never,
       enabled: data.enabled ?? true,
       paused: data.paused ?? false,
-      revision: (existing?.revision ?? 0) + 1,
+      revision: existing.revision + 1,
       updated_at: new Date().toISOString(),
       ...(data.label ? { label: data.label } : {}),
     };
 
-    if (existing) {
-      const { error } = await supabaseAdmin
-        .from("projector_channels")
-        .update(payload)
-        .eq("id", existing.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await supabaseAdmin.from("projector_channels").insert(payload);
-      if (error) throw new Error(error.message);
-    }
+    const { error } = await supabaseAdmin
+      .from("projector_channels")
+      .update(payload)
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
 
     return { revision: payload.revision, updatedAt: payload.updated_at };
   });
@@ -143,6 +150,16 @@ export const createMediaUploadUrl = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => uploadSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Uploads are only for real, existing channels — never for an arbitrary
+    // token shape, so the bucket cannot be used as open file hosting.
+    const { data: channel } = await supabaseAdmin
+      .from("projector_channels")
+      .select("id")
+      .eq("token", data.token)
+      .maybeSingle();
+    if (!channel) throw new Error("Unknown projector code");
+
     const safeName = data.fileName.replace(/[^A-Za-z0-9._-]/g, "_").slice(-80);
     const path = `${data.token}/${Date.now().toString(36)}_${safeName}`;
 
