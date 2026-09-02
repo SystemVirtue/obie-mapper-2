@@ -27,10 +27,30 @@ export default function RemoteProjectorPanel({ state }: Props) {
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const provisioning = useRef(false);
+
+  // The output endpoint must exist independently of this UI, so provision a
+  // code and switch remote publishing on the first time the studio loads.
   useEffect(() => {
-    setToken(getStoredToken());
-    setEnabled(getRemoteEnabled());
+    const stored = getStoredToken();
+    setToken(stored);
     setPaused(getRemotePaused());
+    if (stored) {
+      setEnabled(getRemoteEnabled());
+      return;
+    }
+    if (provisioning.current) return;
+    provisioning.current = true;
+    setBusy(true);
+    void createProjectorChannel()
+      .then(({ token: fresh }) => {
+        setStoredToken(fresh);
+        setRemoteEnabled(true);
+        setToken(fresh);
+        setEnabled(true);
+      })
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
   }, []);
 
   const { phase, publishedAt, error } = useRemotePublisher(state, {
