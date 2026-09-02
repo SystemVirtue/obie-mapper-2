@@ -150,6 +150,16 @@ export const createMediaUploadUrl = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => uploadSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Uploads are only for real, existing channels — never for an arbitrary
+    // token shape, so the bucket cannot be used as open file hosting.
+    const { data: channel } = await supabaseAdmin
+      .from("projector_channels")
+      .select("id")
+      .eq("token", data.token)
+      .maybeSingle();
+    if (!channel) throw new Error("Unknown projector code");
+
     const safeName = data.fileName.replace(/[^A-Za-z0-9._-]/g, "_").slice(-80);
     const path = `${data.token}/${Date.now().toString(36)}_${safeName}`;
 
