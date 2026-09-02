@@ -26,6 +26,7 @@ export default function StudioHeader({
   channelSupported,
   autoStart,
   onToggleAutoStart,
+  onLock,
 }: Props) {
   const setResolution = (width: number, height: number) => {
     onPatch({
