@@ -51,6 +51,29 @@ function ProjectorPage() {
       .catch(() => setNeedsGesture(true));
   }, []);
 
+  // Auto-hide the controls after 5s of inactivity; any click/move brings them back.
+  useEffect(() => {
+    let timer = 0;
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setShowControls(false), 5000);
+    };
+    const wake = () => {
+      setShowControls(true);
+      arm();
+    };
+    arm();
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("pointermove", wake);
+    window.addEventListener("keydown", wake);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("pointermove", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "f") toggleFullscreen();
@@ -59,6 +82,7 @@ function ProjectorPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleFullscreen]);
+
 
   return (
     <div ref={shellRef} className="relative h-screen w-screen overflow-hidden bg-black text-foreground">
