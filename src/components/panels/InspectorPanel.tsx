@@ -224,8 +224,10 @@ export default function InspectorPanel({ state, onUpdateNode, onPatch }: Props) 
         )}
       </section>
 
+      <CornerPinPanel state={state} onPatch={onPatch} />
+
       <section className="space-y-3 border-t border-border pt-4">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+
           Falloff compensation
         </h2>
         <p className="text-[11px] text-muted-foreground">
