@@ -1,3 +1,4 @@
+import CornerPinPanel from "@/components/panels/CornerPinPanel";
 import {
   MAX_POLYGON_SIDES,
   MIN_POLYGON_SIDES,
@@ -5,6 +6,7 @@ import {
   type ProjectionNode,
   type ProjectState,
 } from "@/lib/projection-types";
+
 
 interface Props {
   state: ProjectState;
