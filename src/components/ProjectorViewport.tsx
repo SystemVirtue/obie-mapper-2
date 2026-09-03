@@ -213,8 +213,9 @@ export default function ProjectorViewport({
     const move = (event: PointerEvent) => {
       const rect = host.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
-      const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-      const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+      // Allow pins beyond the visible output so a layer can extend off screen.
+      const x = Math.min(2, Math.max(-1, (event.clientX - rect.left) / rect.width));
+      const y = Math.min(2, Math.max(-1, (event.clientY - rect.top) / rect.height));
       const next = stateRef.current.corners.map((c, i) => (i === dragging ? { x, y } : c));
       onCornersChange(next);
     };
@@ -231,18 +232,32 @@ export default function ProjectorViewport({
     <div className="relative h-full w-full overflow-hidden bg-black">
       <div ref={hostRef} className="h-full w-full" />
       {showHandles && onCornersChange
-        ? state.corners.map((corner, index) => (
-            <button
-              key={index}
-              type="button"
-              onPointerDown={() => handlePointerDown(index)}
-              style={{ left: `${corner.x * 100}%`, top: `${corner.y * 100}%` }}
-              className="absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border-2 border-primary bg-background/80 px-2 py-1 text-[10px] font-semibold text-primary shadow-lg active:cursor-grabbing"
-            >
-              {LABELS[index]}
-            </button>
-          ))
+        ? state.corners.map((corner, index) => {
+            const offCanvas =
+              corner.x < 0 || corner.x > 1 || corner.y < 0 || corner.y > 1;
+            // Keep off-canvas pins reachable by pinning their handle to the edge.
+            const left = Math.min(97, Math.max(3, corner.x * 100));
+            const top = Math.min(97, Math.max(3, corner.y * 100));
+            return (
+              <button
+                key={index}
+                type="button"
+                onPointerDown={() => handlePointerDown(index)}
+                style={{ left: `${left}%`, top: `${top}%` }}
+                title={offCanvas ? "Pin is outside the output area" : undefined}
+                className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border-2 bg-background/80 px-2 py-1 text-[10px] font-semibold shadow-lg active:cursor-grabbing ${
+                  offCanvas
+                    ? "border-destructive text-destructive"
+                    : "border-primary text-primary"
+                }`}
+              >
+                {LABELS[index]}
+                {offCanvas ? "*" : ""}
+              </button>
+            );
+          })
         : null}
+
       {fallback ? (
         <p className="absolute bottom-2 left-2 z-10 rounded bg-background/80 px-2 py-1 text-[10px] text-muted-foreground">
           Shader unavailable — using geometry warp fallback
