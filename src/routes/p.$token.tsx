@@ -34,12 +34,15 @@ const MESSAGES: Record<Exclude<ProjectorStatus, "live" | "unchanged">, string> =
   disabled: "Remote projector is switched off in the studio.",
 };
 
+const FS_CONSENT_KEY = "spm.remoteAutoFullscreen";
+
 function RemoteProjectorPage() {
   const { token } = Route.useParams();
   const navigate = useNavigate();
   const [state, setState] = useState<ProjectState | null>(null);
   const [status, setStatus] = useState<ProjectorStatus | "offline">("waiting");
   const [showBadge, setShowBadge] = useState(true);
+  const [autoFullscreen, setAutoFullscreen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const revisionRef = useRef(0);
 
@@ -48,6 +51,38 @@ function RemoteProjectorPage() {
     if (!el) return;
     if (document.fullscreenElement) void document.exitFullscreen();
     else void el.requestFullscreen?.().catch(() => undefined);
+  }, []);
+
+  // Remembered consent: auto-request fullscreen on load, and on the first tap
+  // if the browser rejects the automatic request without a gesture.
+  useEffect(() => {
+    if (typeof localStorage === "undefined") return;
+    const consented = localStorage.getItem(FS_CONSENT_KEY) === "1";
+    setAutoFullscreen(consented);
+    if (!consented) return;
+    const el = shellRef.current;
+    if (!el || document.fullscreenElement) return;
+    const request = () => {
+      void el.requestFullscreen?.().catch(() => undefined);
+    };
+    request();
+    const once = () => {
+      request();
+      window.removeEventListener("pointerdown", once);
+    };
+    window.addEventListener("pointerdown", once);
+    return () => window.removeEventListener("pointerdown", once);
+  }, []);
+
+  const enableAutoFullscreen = useCallback(() => {
+    if (typeof localStorage !== "undefined") localStorage.setItem(FS_CONSENT_KEY, "1");
+    setAutoFullscreen(true);
+    toggleFullscreen();
+  }, [toggleFullscreen]);
+
+  const disableAutoFullscreen = useCallback(() => {
+    if (typeof localStorage !== "undefined") localStorage.removeItem(FS_CONSENT_KEY);
+    setAutoFullscreen(false);
   }, []);
 
   // Poll the published snapshot; `sinceRevision` keeps unchanged replies tiny.
@@ -76,15 +111,28 @@ function RemoteProjectorPage() {
     };
   }, [token]);
 
-  // Keep the badge out of the projection once everything is healthy.
+  // Auto-hide the controls after 5s of inactivity; click/tap brings them back.
   useEffect(() => {
-    if (status !== "live" && status !== "unchanged") {
+    let timer = 0;
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setShowBadge(false), 5000);
+    };
+    const wake = () => {
       setShowBadge(true);
-      return;
-    }
-    const id = window.setTimeout(() => setShowBadge(false), 4000);
-    return () => window.clearTimeout(id);
-  }, [status]);
+      arm();
+    };
+    arm();
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("pointermove", wake);
+    window.addEventListener("keydown", wake);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("pointermove", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -138,14 +186,39 @@ function RemoteProjectorPage() {
       ) : null}
 
       {showBadge ? (
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-md border border-border bg-card/80 px-3 py-1.5 text-[11px] text-foreground backdrop-blur"
+        <ControlDock
+          title="Output"
+          storageKey="spm.dock.remote"
+          defaultPosition={{
+            x: typeof window === "undefined" ? 16 : Math.max(16, window.innerWidth - 220),
+            y: 16,
+          }}
+          className="w-52"
         >
-          <Maximize2 className="size-3" /> Fullscreen (F)
-        </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="flex w-full items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-foreground"
+            >
+              <Maximize2 className="size-3" /> Fullscreen (F)
+            </button>
+            <button
+              type="button"
+              onClick={autoFullscreen ? disableAutoFullscreen : enableAutoFullscreen}
+              className={`w-full rounded-md border px-2 py-1 ${
+                autoFullscreen
+                  ? "border-primary/60 bg-primary/15 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {autoFullscreen ? "Auto-fullscreen ON" : "Always fullscreen on this device"}
+            </button>
+            <p className="text-muted-foreground">Controls hide after 5s — tap to show.</p>
+          </div>
+        </ControlDock>
       ) : null}
     </div>
   );
 }
+
