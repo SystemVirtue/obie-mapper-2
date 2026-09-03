@@ -2,8 +2,10 @@ import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2 } from "lucide-react";
 
+import ControlDock from "@/components/ControlDock";
 import OutputRecorder from "@/components/OutputRecorder";
 import { useProjectorMirror } from "@/lib/projection-channel";
+
 
 const ProjectorViewport = lazy(() => import("@/components/ProjectorViewport"));
 
@@ -51,6 +53,29 @@ function ProjectorPage() {
       .catch(() => setNeedsGesture(true));
   }, []);
 
+  // Auto-hide the controls after 5s of inactivity; any click/move brings them back.
+  useEffect(() => {
+    let timer = 0;
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setShowControls(false), 5000);
+    };
+    const wake = () => {
+      setShowControls(true);
+      arm();
+    };
+    arm();
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("pointermove", wake);
+    window.addEventListener("keydown", wake);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("pointermove", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "f") toggleFullscreen();
@@ -59,6 +84,7 @@ function ProjectorPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleFullscreen]);
+
 
   return (
     <div ref={shellRef} className="relative h-screen w-screen overflow-hidden bg-black text-foreground">
@@ -90,26 +116,33 @@ function ProjectorPage() {
         </button>
       ) : null}
 
-      <div className="absolute right-3 top-3 z-20 flex flex-col items-end gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="flex items-center gap-1 rounded-md border border-border bg-card/80 px-3 py-1.5 text-[11px] text-foreground backdrop-blur"
-          >
-            <Maximize2 className="size-3" /> Fullscreen (F)
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowControls((v) => !v)}
-            className="rounded-md border border-border bg-card/80 px-3 py-1.5 text-[11px] text-foreground backdrop-blur"
-          >
-            {showControls ? "Hide controls (H)" : "Show controls"}
-          </button>
-        </div>
-
-        {showControls ? (
-          <div className="w-56 space-y-3 rounded-md border border-border bg-card/85 p-3 text-[11px] backdrop-blur">
+      {showControls ? (
+        <ControlDock
+          title="Output controls"
+          storageKey="spm.dock.projector"
+          defaultPosition={{
+            x: typeof window === "undefined" ? 16 : Math.max(16, window.innerWidth - 250),
+            y: 16,
+          }}
+          className="w-56"
+        >
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-foreground"
+              >
+                <Maximize2 className="size-3" /> Fullscreen (F)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowControls(false)}
+                className="rounded-md border border-border px-2 py-1 text-muted-foreground"
+              >
+                Hide (H)
+              </button>
+            </div>
             <p className={connected ? "text-primary" : "text-muted-foreground"}>
               {connected ? "Synced with editor" : "Waiting for editor…"}
             </p>
@@ -173,11 +206,12 @@ function ProjectorPage() {
             </label>
             <OutputRecorder getCanvas={() => canvasRef.current} />
             <p className="text-muted-foreground">
-              Drag the TL / TR / BR / BL handles onto the physical wall bounds.
+              Drag this panel by its handle; drag TL / TR / BR / BL onto the wall bounds.
             </p>
           </div>
-        ) : null}
-      </div>
+        </ControlDock>
+      ) : null}
+
     </div>
   );
 }
