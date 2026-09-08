@@ -2,6 +2,7 @@ import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2 } from "lucide-react";
 
+import ControlDock from "@/components/ControlDock";
 import { getProjectorScene, type ProjectorStatus } from "@/lib/projector.functions";
 import { createDefaultState, type ProjectState } from "@/lib/projection-types";
 
