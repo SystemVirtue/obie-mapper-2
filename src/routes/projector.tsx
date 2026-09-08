@@ -145,6 +145,28 @@ function ProjectorPage() {
                 Hide (H)
               </button>
             </div>
+            {cast.state !== "unsupported" ? (
+              <button
+                type="button"
+                onClick={() => (cast.state === "casting" ? cast.stopCast() : void cast.startCast())}
+                disabled={cast.state === "connecting" || cast.state === "unavailable"}
+                className={`flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50 ${
+                  cast.state === "casting"
+                    ? "border-primary/60 bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                <Cast className="size-3" />
+                {cast.state === "casting"
+                  ? "Stop casting"
+                  : cast.state === "connecting"
+                    ? "Connecting…"
+                    : cast.state === "unavailable"
+                      ? "No Cast device"
+                      : "Cast to TV"}
+              </button>
+            ) : null}
+            {cast.error ? <p className="text-destructive">{cast.error}</p> : null}
             <p className={connected ? "text-primary" : "text-muted-foreground"}>
               {connected ? "Synced with editor" : "Waiting for editor…"}
             </p>
