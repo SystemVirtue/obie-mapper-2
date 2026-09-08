@@ -1,9 +1,10 @@
 import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { Maximize2 } from "lucide-react";
+import { Cast, Maximize2 } from "lucide-react";
 
 import ControlDock from "@/components/ControlDock";
 import OutputRecorder from "@/components/OutputRecorder";
+import { useCast } from "@/lib/use-cast";
 import { useProjectorMirror } from "@/lib/projection-channel";
 
 
@@ -33,6 +34,7 @@ function ProjectorPage() {
   const [showControls, setShowControls] = useState(true);
   const shellRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cast = useCast(typeof window === "undefined" ? "" : window.location.href);
 
   const toggleFullscreen = useCallback(() => {
     const el = shellRef.current;
@@ -143,6 +145,28 @@ function ProjectorPage() {
                 Hide (H)
               </button>
             </div>
+            {cast.state !== "unsupported" ? (
+              <button
+                type="button"
+                onClick={() => (cast.state === "casting" ? cast.stopCast() : void cast.startCast())}
+                disabled={cast.state === "connecting" || cast.state === "unavailable"}
+                className={`flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50 ${
+                  cast.state === "casting"
+                    ? "border-primary/60 bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                <Cast className="size-3" />
+                {cast.state === "casting"
+                  ? "Stop casting"
+                  : cast.state === "connecting"
+                    ? "Connecting…"
+                    : cast.state === "unavailable"
+                      ? "No Cast device"
+                      : "Cast to TV"}
+              </button>
+            ) : null}
+            {cast.error ? <p className="text-destructive">{cast.error}</p> : null}
             <p className={connected ? "text-primary" : "text-muted-foreground"}>
               {connected ? "Synced with editor" : "Waiting for editor…"}
             </p>
