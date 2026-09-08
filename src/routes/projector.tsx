@@ -34,6 +34,7 @@ function ProjectorPage() {
   const [showControls, setShowControls] = useState(true);
   const shellRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cast = useCast(typeof window === "undefined" ? "" : window.location.href);
 
   const toggleFullscreen = useCallback(() => {
     const el = shellRef.current;
