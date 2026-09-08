@@ -1,9 +1,10 @@
 import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { Maximize2 } from "lucide-react";
+import { Cast, Maximize2 } from "lucide-react";
 
 import ControlDock from "@/components/ControlDock";
 import OutputRecorder from "@/components/OutputRecorder";
+import { useCast } from "@/lib/use-cast";
 import { useProjectorMirror } from "@/lib/projection-channel";
 
 
