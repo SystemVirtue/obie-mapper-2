@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Pause, Play, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { Cast, Copy, Pause, Play, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import QRCode from "qrcode";
 
 import { createProjectorChannel } from "@/lib/projector.functions";
@@ -14,6 +14,8 @@ import {
 } from "@/lib/projector-link";
 import type { ProjectState } from "@/lib/projection-types";
 import { useRemotePublisher } from "@/lib/use-remote-publisher";
+import { useCast } from "@/lib/use-cast";
+
 
 interface Props {
   state: ProjectState;
@@ -61,6 +63,8 @@ export default function RemoteProjectorPanel({ state }: Props) {
   });
 
   const url = token ? projectorUrl(token) : "";
+  const cast = useCast(url);
+
 
   useEffect(() => {
     if (!url || !canvasRef.current) return;
@@ -199,6 +203,28 @@ export default function RemoteProjectorPanel({ state }: Props) {
               >
                 Open output
               </a>
+              {cast.state !== "unsupported" ? (
+                <button
+                  type="button"
+                  onClick={() => (cast.state === "casting" ? cast.stopCast() : void cast.startCast())}
+                  disabled={cast.state === "connecting" || cast.state === "unavailable"}
+                  className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50 ${
+                    cast.state === "casting"
+                      ? "border-primary/60 bg-primary/15 text-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  <Cast className="size-3" />
+                  {cast.state === "casting"
+                    ? "Stop casting"
+                    : cast.state === "connecting"
+                      ? "Connecting…"
+                      : cast.state === "unavailable"
+                        ? "No Cast device"
+                        : "Cast to TV"}
+                </button>
+              ) : null}
+
             </div>
           </div>
         </div>
@@ -228,6 +254,17 @@ export default function RemoteProjectorPanel({ state }: Props) {
                     ? `Published ${secondsAgo}s ago`
                     : "Waiting to publish…"}
       </p>
+
+      {cast.error ? (
+        <p className="text-destructive">{cast.error}</p>
+      ) : cast.state === "casting" ? (
+        <p className="text-primary">Casting full screen to your TV.</p>
+      ) : cast.state === "unsupported" ? (
+        <p className="text-muted-foreground">
+          Casting needs Chrome or Edge on desktop or Android.
+        </p>
+      ) : null}
+
     </section>
   );
 }
