@@ -63,6 +63,8 @@ export default function RemoteProjectorPanel({ state }: Props) {
   });
 
   const url = token ? projectorUrl(token) : "";
+  const cast = useCast(url);
+
 
   useEffect(() => {
     if (!url || !canvasRef.current) return;
