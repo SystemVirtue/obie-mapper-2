@@ -254,6 +254,17 @@ export default function RemoteProjectorPanel({ state }: Props) {
                     ? `Published ${secondsAgo}s ago`
                     : "Waiting to publish…"}
       </p>
+
+      {cast.error ? (
+        <p className="text-destructive">{cast.error}</p>
+      ) : cast.state === "casting" ? (
+        <p className="text-primary">Casting full screen to your TV.</p>
+      ) : cast.state === "unsupported" ? (
+        <p className="text-muted-foreground">
+          Casting needs Chrome or Edge on desktop or Android.
+        </p>
+      ) : null}
+
     </section>
   );
 }
