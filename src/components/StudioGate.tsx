@@ -66,7 +66,11 @@ export default function StudioGate({ children }: { children: ReactNode }) {
   if (unlocked) return <>{children}</>;
 
   if (!checked) {
-    return <div className="h-screen w-screen bg-background" />;
+    return (
+      <main className="flex h-screen w-screen items-center justify-center bg-background text-xs text-muted-foreground">
+        Loading studio…
+      </main>
+    );
   }
 
   return (
@@ -86,10 +90,13 @@ export default function StudioGate({ children }: { children: ReactNode }) {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          placeholder="Studio password"
+          aria-label="Studio password"
           autoComplete="current-password"
           autoFocus
-          className="w-full rounded-md border border-border bg-background/60 px-3 py-2 text-center text-xs text-foreground outline-none focus:border-primary"
+          className="w-full rounded-md border border-border bg-background/60 px-3 py-2 text-center text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary"
         />
+
         {error ? <p className="text-[11px] text-destructive">Incorrect password</p> : null}
         <button
           type="submit"
