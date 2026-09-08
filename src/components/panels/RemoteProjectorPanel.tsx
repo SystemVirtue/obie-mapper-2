@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Pause, Play, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { Cast, Copy, Pause, Play, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import QRCode from "qrcode";
 
 import { createProjectorChannel } from "@/lib/projector.functions";
@@ -14,6 +14,8 @@ import {
 } from "@/lib/projector-link";
 import type { ProjectState } from "@/lib/projection-types";
 import { useRemotePublisher } from "@/lib/use-remote-publisher";
+import { useCast } from "@/lib/use-cast";
+
 
 interface Props {
   state: ProjectState;
