@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import RemoteOutput from "@/components/RemoteOutput";
+import { LIVE_OUTPUT_TOKEN } from "@/lib/projector-link";
 
-const TITLE = "Remote Projector Output — Side-Projection Mapping Suite";
+const TITLE = "Live Output — Side-Projection Mapping Suite";
 const DESCRIPTION =
-  "Dedicated fullscreen projector endpoint that mirrors the mapped output of a studio session on any device via a private projector code.";
+  "Permanent fullscreen projector endpoint for kiosk displays: always shows the latest mapped scene published from the studio, with no code or password.";
 
-export const Route = createFileRoute("/p/$token")({
+export const Route = createFileRoute("/liveoutput")({
   head: () => ({
     meta: [
       { title: TITLE },
@@ -18,10 +19,9 @@ export const Route = createFileRoute("/p/$token")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: RemoteProjectorPage,
+  component: LiveOutputPage,
 });
 
-function RemoteProjectorPage() {
-  const { token } = Route.useParams();
-  return <RemoteOutput token={token} allowCodeEntry />;
+function LiveOutputPage() {
+  return <RemoteOutput token={LIVE_OUTPUT_TOKEN} />;
 }
