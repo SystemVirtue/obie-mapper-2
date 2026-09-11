@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LiveoutputRouteImport } from './routes/liveoutput'
 import { Route as ProjectorRouteImport } from './routes/projector'
 import { Route as PIndexRouteImport } from './routes/p.index'
 import { Route as PTokenRouteImport } from './routes/p.$token'
@@ -17,6 +18,11 @@ import { Route as PTokenRouteImport } from './routes/p.$token'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveoutputRoute = LiveoutputRouteImport.update({
+  id: '/liveoutput',
+  path: '/liveoutput',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectorRoute = ProjectorRouteImport.update({
@@ -37,12 +43,14 @@ const PTokenRoute = PTokenRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/liveoutput': typeof LiveoutputRoute
   '/projector': typeof ProjectorRoute
   '/p/$token': typeof PTokenRoute
   '/p/': typeof PIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/liveoutput': typeof LiveoutputRoute
   '/projector': typeof ProjectorRoute
   '/p/$token': typeof PTokenRoute
   '/p': typeof PIndexRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/liveoutput': typeof LiveoutputRoute
   '/projector': typeof ProjectorRoute
   '/p/$token': typeof PTokenRoute
   '/p/': typeof PIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/projector' | '/p/$token' | '/p/'
+  fullPaths: '/' | '/liveoutput' | '/projector' | '/p/$token' | '/p/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/projector' | '/p/$token' | '/p'
-  id: '__root__' | '/' | '/projector' | '/p/$token' | '/p/'
+  to: '/' | '/liveoutput' | '/projector' | '/p/$token' | '/p'
+  id: '__root__' | '/' | '/liveoutput' | '/projector' | '/p/$token' | '/p/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LiveoutputRoute: typeof LiveoutputRoute
   ProjectorRoute: typeof ProjectorRoute
   PTokenRoute: typeof PTokenRoute
   PIndexRoute: typeof PIndexRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/liveoutput': {
+      id: '/liveoutput'
+      path: '/liveoutput'
+      fullPath: '/liveoutput'
+      preLoaderRoute: typeof LiveoutputRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projector': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LiveoutputRoute: LiveoutputRoute,
   ProjectorRoute: ProjectorRoute,
   PTokenRoute: PTokenRoute,
   PIndexRoute: PIndexRoute,
