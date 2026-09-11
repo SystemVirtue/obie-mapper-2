@@ -1,70 +1,53 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Cast, Copy, Pause, Play, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { Cast, Copy, Pause, Play, Wifi, WifiOff } from "lucide-react";
 import QRCode from "qrcode";
 
-import { createProjectorChannel } from "@/lib/projector.functions";
+import { ensureProjectorChannel } from "@/lib/projector.functions";
 import {
+  LIVE_OUTPUT_TOKEN,
   getRemoteEnabled,
   getRemotePaused,
-  getStoredToken,
   projectorUrl,
   setRemoteEnabled,
   setRemotePaused,
-  setStoredToken,
 } from "@/lib/projector-link";
 import type { ProjectState } from "@/lib/projection-types";
 import { useRemotePublisher } from "@/lib/use-remote-publisher";
 import { useCast } from "@/lib/use-cast";
-
 
 interface Props {
   state: ProjectState;
 }
 
 export default function RemoteProjectorPanel({ state }: Props) {
-  const [token, setToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
   const provisioning = useRef(false);
 
-  // The output endpoint must exist independently of this UI, so provision a
-  // code and switch remote publishing on the first time the studio loads.
+  // The output endpoint lives at a fixed URL, so we only make sure its channel
+  // row exists — no code is generated and the kiosk URL never changes.
   useEffect(() => {
-    const stored = getStoredToken();
-    setToken(stored);
+    setEnabled(getRemoteEnabled());
     setPaused(getRemotePaused());
-    if (stored) {
-      setEnabled(getRemoteEnabled());
-      return;
-    }
     if (provisioning.current) return;
     provisioning.current = true;
-    setBusy(true);
-    void createProjectorChannel()
-      .then(({ token: fresh }) => {
-        setStoredToken(fresh);
-        setRemoteEnabled(true);
-        setToken(fresh);
-        setEnabled(true);
-      })
-      .catch(() => undefined)
-      .finally(() => setBusy(false));
+    void ensureProjectorChannel({ data: { token: LIVE_OUTPUT_TOKEN } })
+      .then(() => setReady(true))
+      .catch(() => setReady(false));
   }, []);
 
   const { phase, publishedAt, error } = useRemotePublisher(state, {
-    token,
+    token: ready ? LIVE_OUTPUT_TOKEN : null,
     enabled,
     paused,
     label: state.name,
   });
 
-  const url = token ? projectorUrl(token) : "";
+  const url = projectorUrl();
   const cast = useCast(url);
-
 
   useEffect(() => {
     if (!url || !canvasRef.current) return;
@@ -75,36 +58,11 @@ export default function RemoteProjectorPanel({ state }: Props) {
     }).catch(() => undefined);
   }, [url]);
 
-  const ensureToken = useCallback(async () => {
-    const existing = getStoredToken();
-    if (existing) return existing;
-    setBusy(true);
-    try {
-      const { token: fresh } = await createProjectorChannel();
-      setStoredToken(fresh);
-      setToken(fresh);
-      return fresh;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
-
-  const toggleEnabled = useCallback(async () => {
-    const next = !enabled;
-    if (next) await ensureToken();
-    setRemoteEnabled(next);
-    setEnabled(next);
-  }, [enabled, ensureToken]);
-
-  const regenerate = useCallback(async () => {
-    setBusy(true);
-    try {
-      const { token: fresh } = await createProjectorChannel();
-      setStoredToken(fresh);
-      setToken(fresh);
-    } finally {
-      setBusy(false);
-    }
+  const toggleEnabled = useCallback(() => {
+    setEnabled((prev) => {
+      setRemoteEnabled(!prev);
+      return !prev;
+    });
   }, []);
 
   const togglePaused = useCallback(() => {
@@ -119,11 +77,10 @@ export default function RemoteProjectorPanel({ state }: Props) {
   return (
     <section className="space-y-3 border-b border-border p-3 text-[11px]">
       <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-foreground">Remote projector</h2>
+        <h2 className="text-xs font-semibold text-foreground">Live output</h2>
         <button
           type="button"
-          onClick={() => void toggleEnabled()}
-          disabled={busy}
+          onClick={toggleEnabled}
           className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
             enabled
               ? "border-primary/60 bg-primary/15 text-primary"
@@ -136,116 +93,82 @@ export default function RemoteProjectorPanel({ state }: Props) {
       </div>
 
       <p className="text-muted-foreground">
-        Opens the mapped output on any device — the remote screen keeps showing the last published
-        scene even after a reload or with this studio closed.
+        Permanent address for kiosk displays — point the screen at it once. It keeps showing the
+        last published scene after a reload or with this studio closed.
       </p>
 
-      {token ? (
-        <div className="space-y-2">
-          <label className="block space-y-1">
-            <span className="text-muted-foreground">Projector code</span>
-            <input
-              value={token}
-              onChange={(e) => {
-                const next = e.target.value.trim();
-                setToken(next);
-                setStoredToken(next || null);
-              }}
-              spellCheck={false}
-              className="w-full rounded-md border border-border bg-background/60 px-2 py-1 font-mono text-[11px] text-foreground outline-none focus:border-primary"
-            />
-          </label>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <input
+            readOnly
+            value={url}
+            className="min-w-0 flex-1 rounded-md border border-border bg-background/40 px-2 py-1 font-mono text-[10px] text-muted-foreground"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(url).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-muted-foreground"
+          >
+            <Copy className="size-3" /> {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              readOnly
-              value={url}
-              className="min-w-0 flex-1 rounded-md border border-border bg-background/40 px-2 py-1 font-mono text-[10px] text-muted-foreground"
-            />
+        <div className="flex items-center gap-3">
+          <canvas ref={canvasRef} className="rounded bg-background/40" />
+          <div className="flex flex-1 flex-col gap-2">
             <button
               type="button"
-              onClick={() => {
-                void navigator.clipboard?.writeText(url).then(() => {
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 1500);
-                });
-              }}
-              className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-muted-foreground"
+              onClick={togglePaused}
+              className="flex items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-muted-foreground"
             >
-              <Copy className="size-3" /> {copied ? "Copied" : "Copy"}
+              {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
+              {paused ? "Resume output" : "Pause output"}
             </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <canvas ref={canvasRef} className="rounded bg-background/40" />
-            <div className="flex flex-1 flex-col gap-2">
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-border px-2 py-1 text-center text-muted-foreground"
+            >
+              Open output
+            </a>
+            {cast.state !== "unsupported" ? (
               <button
                 type="button"
-                onClick={togglePaused}
-                className="flex items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-muted-foreground"
+                onClick={() => (cast.state === "casting" ? cast.stopCast() : void cast.startCast())}
+                disabled={cast.state === "connecting" || cast.state === "unavailable"}
+                className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50 ${
+                  cast.state === "casting"
+                    ? "border-primary/60 bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
               >
-                {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
-                {paused ? "Resume output" : "Pause output"}
+                <Cast className="size-3" />
+                {cast.state === "casting"
+                  ? "Stop casting"
+                  : cast.state === "connecting"
+                    ? "Connecting…"
+                    : cast.state === "unavailable"
+                      ? "No Cast device"
+                      : "Cast to TV"}
               </button>
-              <button
-                type="button"
-                onClick={() => void regenerate()}
-                disabled={busy}
-                className="flex items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-muted-foreground disabled:opacity-50"
-              >
-                <RefreshCw className="size-3" /> Regenerate code
-              </button>
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border border-border px-2 py-1 text-center text-muted-foreground"
-              >
-                Open output
-              </a>
-              {cast.state !== "unsupported" ? (
-                <button
-                  type="button"
-                  onClick={() => (cast.state === "casting" ? cast.stopCast() : void cast.startCast())}
-                  disabled={cast.state === "connecting" || cast.state === "unavailable"}
-                  className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50 ${
-                    cast.state === "casting"
-                      ? "border-primary/60 bg-primary/15 text-primary"
-                      : "border-border text-muted-foreground"
-                  }`}
-                >
-                  <Cast className="size-3" />
-                  {cast.state === "casting"
-                    ? "Stop casting"
-                    : cast.state === "connecting"
-                      ? "Connecting…"
-                      : cast.state === "unavailable"
-                        ? "No Cast device"
-                        : "Cast to TV"}
-                </button>
-              ) : null}
-
-            </div>
+            ) : null}
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => void ensureToken()}
-          disabled={busy}
-          className="w-full rounded-md bg-primary px-2 py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
-        >
-          {busy ? "Creating…" : "Create projector code"}
-        </button>
-      )}
+      </div>
 
       <p className={error ? "text-destructive" : "text-muted-foreground"}>
         {error
           ? error
           : !enabled
-            ? "Remote output disabled."
+            ? "Live output disabled."
             : paused
-              ? "Paused — remote shows a paused notice."
+              ? "Paused — the display shows a paused notice."
               : phase === "uploading"
                 ? "Uploading media…"
                 : phase === "publishing"
@@ -260,11 +183,8 @@ export default function RemoteProjectorPanel({ state }: Props) {
       ) : cast.state === "casting" ? (
         <p className="text-primary">Casting full screen to your TV.</p>
       ) : cast.state === "unsupported" ? (
-        <p className="text-muted-foreground">
-          Casting needs Chrome or Edge on desktop or Android.
-        </p>
+        <p className="text-muted-foreground">Casting needs Chrome or Edge on desktop or Android.</p>
       ) : null}
-
     </section>
   );
 }

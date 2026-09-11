@@ -56,6 +56,29 @@ export interface ProjectorSnapshot {
   label: string | null;
 }
 
+/**
+ * Ensure the permanent kiosk channel row exists. Idempotent: safe to call on
+ * every studio load so `/liveoutput` never needs a generated code.
+ */
+export const ensureProjectorChannel = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ token: tokenSchema }).parse(data))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: existing } = await supabaseAdmin
+      .from("projector_channels")
+      .select("id")
+      .eq("token", data.token)
+      .maybeSingle();
+    if (existing) return { token: data.token, created: false };
+
+    const { error } = await supabaseAdmin
+      .from("projector_channels")
+      .insert({ token: data.token, enabled: true, paused: false });
+    if (error && !/duplicate key/i.test(error.message)) throw new Error(error.message);
+    return { token: data.token, created: true };
+  });
+
 /** Create a fresh, unguessable remote-projector channel. */
 export const createProjectorChannel = createServerFn({ method: "POST" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
