@@ -120,14 +120,13 @@ function hydrate(record: ProjectRecord): ProjectState {
   for (const asset of record.assets) {
     assetUrls.set(asset.id, URL.createObjectURL(asset.blob));
   }
-  const assets: MediaAsset[] = record.assets.map((a) => ({
-    id: a.id,
-    name: a.name,
-    kind: a.kind,
-    url: assetUrls.get(a.id) ?? "",
-  }));
+  // Blob-backed assets get fresh object URLs; code-only assets (shaders, live
+  // camera) are kept from the saved state as they are.
+  const assets: MediaAsset[] = (record.state.assets ?? []).map((a) =>
+    assetUrls.has(a.id) ? { ...a, url: assetUrls.get(a.id)! } : { ...a },
+  );
 
-  return {
+  return normalizeState({
     ...record.state,
     name: record.name,
     assets,
@@ -135,7 +134,7 @@ function hydrate(record: ProjectRecord): ProjectState {
       ...record.state.background,
       url: record.background ? URL.createObjectURL(record.background) : null,
     },
-  };
+  });
 }
 
 export async function loadProject(id: string): Promise<ProjectState | null> {
@@ -145,6 +144,7 @@ export async function loadProject(id: string): Promise<ProjectState | null> {
   db.close();
   return record ? hydrate(record) : null;
 }
+
 
 export async function listProjects(): Promise<ProjectSummary[]> {
   const db = await openDb();
