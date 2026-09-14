@@ -1,12 +1,18 @@
-import type { ProjectState } from "./projection-types";
+import type { PlaylistItem, ProjectState } from "./projection-types";
 
 const DB_NAME = "side-projection-liveoutput";
 const STORE = "playlist";
 const KEY = "active";
 const MARKER = "liveasset:";
 
+export interface LivePlaylistSnapshot {
+  items: PlaylistItem[];
+  loop: boolean;
+  scenes: Record<string, ProjectState>;
+}
+
 interface StoredAsset { id: string; blob: Blob; }
-interface StoredPlaylist { scenes: ProjectState[]; assets: StoredAsset[]; }
+interface StoredPlaylist { items: PlaylistItem[]; loop: boolean; scenes: Record<string, ProjectState>; assets: StoredAsset[]; }
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -56,59 +62,63 @@ export async function clearLivePlaylist() {
   db.close();
 }
 
-export async function persistLivePlaylist(scenes: ProjectState[]) {
+export async function persistLivePlaylist(snapshot: LivePlaylistSnapshot) {
   const assets: StoredAsset[] = [];
-  const storedScenes = scenes.map((scene) => ({
-    ...scene,
-    assets: scene.assets.map((asset) => ({ ...asset })),
-    background: { ...scene.background },
-  }));
-
-  for (const scene of storedScenes) {
+  const scenes: Record<string, ProjectState> = {};
+  for (const [projectId, source] of Object.entries(snapshot.scenes)) {
+    const scene: ProjectState = {
+      ...source,
+      assets: source.assets.map((asset) => ({ ...asset })),
+      background: { ...source.background },
+    };
     for (const asset of scene.assets) {
       if (!asset.url || !/^https?:\/\//.test(asset.url)) continue;
       try {
         const response = await fetch(asset.url);
         if (!response.ok) continue;
-        assets.push({ id: asset.id, blob: await response.blob() });
-        asset.url = `${MARKER}${asset.id}`;
+        assets.push({ id: `${projectId}:${asset.id}`, blob: await response.blob() });
+        asset.url = `${MARKER}${projectId}:${asset.id}`;
       } catch {
-        // Keep the remote URL as a fallback if the browser cannot cache it.
+        // Keep the signed URL as a fallback.
       }
     }
     if (scene.background.url && /^https?:\/\//.test(scene.background.url)) {
       try {
         const response = await fetch(scene.background.url);
         if (response.ok) {
-          const id = `background-${scene.name || "scene"}-${assets.length}`;
+          const id = `${projectId}:background`;
           assets.push({ id, blob: await response.blob() });
           scene.background.url = `${MARKER}${id}`;
         }
       } catch {
-        // Keep the remote URL as a fallback.
+        // Keep the signed URL as a fallback.
       }
     }
+    scenes[projectId] = scene;
   }
-
-  await put({ scenes: storedScenes, assets });
+  await put({ items: snapshot.items, loop: snapshot.loop, scenes, assets });
 }
 
-export async function loadLivePlaylist(): Promise<ProjectState[] | null> {
+export async function loadLivePlaylist(): Promise<LivePlaylistSnapshot | null> {
   const stored = await get().catch(() => null);
-  if (!stored?.scenes?.length) return null;
+  if (!stored?.items?.length) return null;
   const urls = new Map<string, string>();
   for (const asset of stored.assets ?? []) urls.set(asset.id, URL.createObjectURL(asset.blob));
-  return stored.scenes.map((scene) => ({
-    ...scene,
-    assets: scene.assets.map((asset) => ({
-      ...asset,
-      url: asset.url.startsWith(MARKER) ? (urls.get(asset.url.slice(MARKER.length)) ?? asset.url) : asset.url,
-    })),
-    background: {
-      ...scene.background,
-      url: scene.background.url?.startsWith(MARKER)
-        ? (urls.get(scene.background.url.slice(MARKER.length)) ?? scene.background.url)
-        : scene.background.url,
-    },
-  }));
+  const scenes: Record<string, ProjectState> = {};
+  for (const [projectId, source] of Object.entries(stored.scenes ?? {})) {
+    scenes[projectId] = {
+      ...source,
+      assets: source.assets.map((asset) => ({
+        ...asset,
+        url: asset.url.startsWith(MARKER) ? (urls.get(asset.url.slice(MARKER.length)) ?? asset.url) : asset.url,
+      })),
+      background: {
+        ...source.background,
+        url: source.background.url?.startsWith(MARKER)
+          ? (urls.get(source.background.url.slice(MARKER.length)) ?? source.background.url)
+          : source.background.url,
+      },
+    };
+  }
+  return { items: stored.items, loop: stored.loop, scenes };
 }
