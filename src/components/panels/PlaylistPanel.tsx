@@ -26,8 +26,13 @@ export default function PlaylistPanel({ state, onPatch }: Props) {
   return <section className="space-y-3 border-b border-border p-4">
     <div className="flex items-center justify-between"><h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Playlist</h2><span className="text-[10px] text-muted-foreground">{state.playlist.length} scenes</span></div>
     <div className="space-y-2">
-      <input list="saved-scene-options" value={sceneName} onChange={(e) => setSceneName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Type or select scene name…" className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs" />
-      <datalist id="saved-scene-options">{projects.map((project) => <option key={project.id} value={project.name}>{project.nodeCount} nodes · {project.assetCount} assets</option>)}</datalist>
+      <label className="text-[10px] text-muted-foreground">Scene to add</label>
+      <select value={selectedProject?.id ?? ""} onChange={(e) => setSceneName(projects.find((p) => p.id === e.target.value)?.name ?? "")} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs">
+        <option value="">Select a saved scene…</option>
+        {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+      </select>
+      <input value={sceneName} onChange={(e) => setSceneName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Or type exact scene name…" className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs" />
+      <p className="text-[10px] text-muted-foreground">Choose from all saved scenes, or type an exact saved scene name.</p>
       <button type="button" className={`${btn} w-full justify-center`} disabled={!selectedProject} onClick={add}><ListPlus className="size-3.5" /> Add scene</button>
     </div>
     {state.playlist.map((item, index) => <div key={`${item.projectId}-${index}`} className="space-y-2 rounded-md border border-border/70 p-2">
