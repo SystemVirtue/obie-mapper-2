@@ -1,5 +1,35 @@
 export type NodeKind = "rect" | "polygon" | "particles";
-export type MediaKind = "color" | "image" | "video";
+export type MediaKind = "color" | "image" | "video" | "shader" | "camera";
+
+/** Canvas-supported layer blend modes (OBS-style compositing). */
+export const BLEND_MODES = [
+  "normal",
+  "multiply",
+  "screen",
+  "overlay",
+  "darken",
+  "lighten",
+  "color-dodge",
+  "color-burn",
+  "hard-light",
+  "soft-light",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
+  "lighter",
+] as const;
+export type BlendMode = (typeof BLEND_MODES)[number];
+
+/** Live signal that can drive a layer property. */
+export const REACT_SOURCES = ["none", "level", "bass", "mid", "treble", "beat", "motion"] as const;
+export type ReactSource = (typeof REACT_SOURCES)[number];
+
+export const REACT_TARGETS = ["scale", "opacity", "glow", "speed", "rotation"] as const;
+export type ReactTarget = (typeof REACT_TARGETS)[number];
+
 
 export interface ProjectionNode {
   id: string;
