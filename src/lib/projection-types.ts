@@ -59,19 +59,44 @@ export interface ProjectionNode {
   glowIntensity: number;
   /** Trigger a pulse animation every N seconds (0 = off) */
   triggerSeconds: number;
+  /** Compositing mode against the layers below */
+  blendMode: BlendMode;
+  /** Solo: when any layer is soloed, only soloed layers render */
+  solo: boolean;
+  /** Live signal driving a property (mic / camera) */
+  reactSource: ReactSource;
+  reactTarget: ReactTarget;
+  /** How strongly the signal moves the property (0..1) */
+  reactAmount: number;
 }
 
 
 export interface MediaAsset {
   id: string;
   name: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "shader" | "camera";
   url: string;
+  /** GLSL fragment source (Shadertoy-style mainImage) for shader assets */
+  code?: string;
+  /** Credit / origin for imported open-source visuals */
+  source?: string;
 }
 
 export interface CornerPin {
   x: number;
   y: number;
+}
+
+export type OutputMode = "current" | "playlist" | "hidden" | "pattern";
+
+export interface PlaylistItem {
+  /** Saved scene id in the local project store */
+  projectId: string;
+  name: string;
+  /** Seconds on screen */
+  seconds: number;
+  /** Fade-through-black duration in seconds */
+  fade: number;
 }
 
 export interface ProjectState {
@@ -100,7 +125,13 @@ export interface ProjectState {
   xray: boolean;
   /** Calibration test pattern overlay on the output */
   testPattern: boolean;
+  /** What the live output shows */
+  outputMode: OutputMode;
+  /** Scene sequence for playlist mode */
+  playlist: PlaylistItem[];
+  playlistLoop: boolean;
 }
+
 
 export const DEFAULT_CORNERS: CornerPin[] = [
   { x: 0.06, y: 0.12 },
