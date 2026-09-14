@@ -1,5 +1,35 @@
 export type NodeKind = "rect" | "polygon" | "particles";
-export type MediaKind = "color" | "image" | "video";
+export type MediaKind = "color" | "image" | "video" | "shader" | "camera";
+
+/** Canvas-supported layer blend modes (OBS-style compositing). */
+export const BLEND_MODES = [
+  "normal",
+  "multiply",
+  "screen",
+  "overlay",
+  "darken",
+  "lighten",
+  "color-dodge",
+  "color-burn",
+  "hard-light",
+  "soft-light",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
+  "lighter",
+] as const;
+export type BlendMode = (typeof BLEND_MODES)[number];
+
+/** Live signal that can drive a layer property. */
+export const REACT_SOURCES = ["none", "level", "bass", "mid", "treble", "beat", "motion"] as const;
+export type ReactSource = (typeof REACT_SOURCES)[number];
+
+export const REACT_TARGETS = ["scale", "opacity", "glow", "speed", "rotation"] as const;
+export type ReactTarget = (typeof REACT_TARGETS)[number];
+
 
 export interface ProjectionNode {
   id: string;
@@ -29,19 +59,44 @@ export interface ProjectionNode {
   glowIntensity: number;
   /** Trigger a pulse animation every N seconds (0 = off) */
   triggerSeconds: number;
+  /** Compositing mode against the layers below */
+  blendMode: BlendMode;
+  /** Solo: when any layer is soloed, only soloed layers render */
+  solo: boolean;
+  /** Live signal driving a property (mic / camera) */
+  reactSource: ReactSource;
+  reactTarget: ReactTarget;
+  /** How strongly the signal moves the property (0..1) */
+  reactAmount: number;
 }
 
 
 export interface MediaAsset {
   id: string;
   name: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "shader" | "camera";
   url: string;
+  /** GLSL fragment source (Shadertoy-style mainImage) for shader assets */
+  code?: string;
+  /** Credit / origin for imported open-source visuals */
+  source?: string;
 }
 
 export interface CornerPin {
   x: number;
   y: number;
+}
+
+export type OutputMode = "current" | "playlist" | "hidden" | "pattern";
+
+export interface PlaylistItem {
+  /** Saved scene id in the local project store */
+  projectId: string;
+  name: string;
+  /** Seconds on screen */
+  seconds: number;
+  /** Fade-through-black duration in seconds */
+  fade: number;
 }
 
 export interface ProjectState {
@@ -70,7 +125,13 @@ export interface ProjectState {
   xray: boolean;
   /** Calibration test pattern overlay on the output */
   testPattern: boolean;
+  /** What the live output shows */
+  outputMode: OutputMode;
+  /** Scene sequence for playlist mode */
+  playlist: PlaylistItem[];
+  playlistLoop: boolean;
 }
+
 
 export const DEFAULT_CORNERS: CornerPin[] = [
   { x: 0.06, y: 0.12 },
@@ -99,8 +160,33 @@ export function createDefaultState(): ProjectState {
     brightness: 1,
     xray: false,
     testPattern: false,
+    outputMode: "current",
+    playlist: [],
+    playlistLoop: true,
   };
 }
+
+/** Fill in fields added after a scene was saved, so older scenes keep working. */
+export function normalizeState(input: ProjectState): ProjectState {
+  const base = createDefaultState();
+  return {
+    ...base,
+    ...input,
+    outputMode: input.outputMode ?? base.outputMode,
+    playlist: Array.isArray(input.playlist) ? input.playlist : [],
+    playlistLoop: input.playlistLoop ?? true,
+    assets: (input.assets ?? []).map((a) => ({ ...a })),
+    nodes: (input.nodes ?? []).map((n) => ({
+      ...n,
+      blendMode: n.blendMode ?? "normal",
+      solo: n.solo ?? false,
+      reactSource: n.reactSource ?? "none",
+      reactTarget: n.reactTarget ?? "scale",
+      reactAmount: n.reactAmount ?? 0.5,
+    })),
+  };
+}
+
 
 
 let counter = 0;
@@ -156,6 +242,12 @@ export function createNode(kind: NodeKind, index: number): ProjectionNode {
     glow: false,
     glowIntensity: 0.6,
     triggerSeconds: 0,
+    blendMode: "normal",
+    solo: false,
+    reactSource: "none",
+    reactTarget: "scale",
+    reactAmount: 0.5,
+
   };
 
   if (kind === "polygon") {
