@@ -3,7 +3,9 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle, Redo2, Undo2 } from "lucide-react";
 
 import OutputRecorder from "@/components/OutputRecorder";
+import PreviewWindow from "@/components/PreviewWindow";
 import InspectorPanel from "@/components/panels/InspectorPanel";
+import PlaylistPanel from "@/components/panels/PlaylistPanel";
 import RemoteProjectorPanel from "@/components/panels/RemoteProjectorPanel";
 import ScenePanel from "@/components/panels/ScenePanel";
 import StudioGate, { clearStudioUnlockFlag } from "@/components/StudioGate";
@@ -153,7 +155,6 @@ function EditorPage() {
     if (!win) setSplitView(true);
   }, []);
 
-  // Auto-start the output window (fullscreen on a secondary display) on load.
   useEffect(() => {
     const enabled = getAutoStart();
     setAutoStartState(enabled);
@@ -174,7 +175,6 @@ function EditorPage() {
     });
   }, []);
 
-  // Global keyboard shortcuts (⌘S is handled inside ScenePanel).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -250,6 +250,7 @@ function EditorPage() {
               reset(createDefaultState());
             }}
           />
+          <PlaylistPanel state={state} onPatch={patch} />
           <ClientOnly fallback={null}>
             <RemoteProjectorPanel state={state} />
           </ClientOnly>
@@ -273,35 +274,19 @@ function EditorPage() {
 
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center gap-2 border-b border-border bg-card/40 px-3 py-1.5 text-[11px] text-muted-foreground">
-            <button
-              type="button"
-              onClick={undo}
-              disabled={!canUndo}
-              className="flex items-center gap-1 rounded border border-border px-2 py-1 disabled:opacity-40"
-            >
+            <button type="button" onClick={undo} disabled={!canUndo} className="flex items-center gap-1 rounded border border-border px-2 py-1 disabled:opacity-40">
               <Undo2 className="size-3" /> Undo
             </button>
-            <button
-              type="button"
-              onClick={redo}
-              disabled={!canRedo}
-              className="flex items-center gap-1 rounded border border-border px-2 py-1 disabled:opacity-40"
-            >
+            <button type="button" onClick={redo} disabled={!canRedo} className="flex items-center gap-1 rounded border border-border px-2 py-1 disabled:opacity-40">
               <Redo2 className="size-3" /> Redo
             </button>
-            <span className="ml-auto">
-              ⌘Z undo · ⌘⇧Z redo · ⌘D duplicate · ⌫ delete · X x-ray · G grid · ⌘S save
-            </span>
+            <span className="ml-auto">⌘Z undo · ⌘⇧Z redo · ⌘D duplicate · ⌫ delete · X x-ray · G grid · ⌘S save</span>
           </div>
 
           <div className="min-h-0 flex-1">
             <ClientOnly fallback={<StagePlaceholder label="Loading stage…" />}>
               <Suspense fallback={<StagePlaceholder label="Loading stage…" />}>
-                <EditorStage
-                  state={state}
-                  onSelect={(id) => patch({ selectedId: id })}
-                  onUpdateNode={updateNode}
-                />
+                <EditorStage state={state} onSelect={(id) => patch({ selectedId: id })} onUpdateNode={updateNode} />
               </Suspense>
             </ClientOnly>
           </div>
@@ -310,9 +295,7 @@ function EditorPage() {
             <div className="h-2/5 min-h-[220px] border-t border-border">
               <div className="flex items-center justify-between gap-3 border-b border-border bg-card/60 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <span>Projector viewport (inline)</span>
-                <div className="w-44">
-                  <OutputRecorder getCanvas={() => inlineCanvasRef.current} />
-                </div>
+                <div className="w-44"><OutputRecorder getCanvas={() => inlineCanvasRef.current} /></div>
               </div>
               <div className="h-[calc(100%-34px)]">
                 <ClientOnly fallback={<StagePlaceholder label="Loading output…" />}>
@@ -320,9 +303,7 @@ function EditorPage() {
                     <ProjectorViewport
                       state={state}
                       showHandles
-                      onCanvasReady={(canvas) => {
-                        inlineCanvasRef.current = canvas;
-                      }}
+                      onCanvasReady={(canvas) => { inlineCanvasRef.current = canvas; }}
                       onCornersChange={(corners) => patch({ corners })}
                     />
                   </Suspense>
@@ -334,6 +315,8 @@ function EditorPage() {
 
         <InspectorPanel state={state} onUpdateNode={updateNode} onPatch={patch} />
       </div>
+
+      <PreviewWindow state={state} onCornersChange={(corners) => patch({ corners })} />
     </div>
   );
 }
