@@ -242,6 +242,12 @@ export function createNode(kind: NodeKind, index: number): ProjectionNode {
     glow: false,
     glowIntensity: 0.6,
     triggerSeconds: 0,
+    blendMode: "normal",
+    solo: false,
+    reactSource: "none",
+    reactTarget: "scale",
+    reactAmount: 0.5,
+
   };
 
   if (kind === "polygon") {
