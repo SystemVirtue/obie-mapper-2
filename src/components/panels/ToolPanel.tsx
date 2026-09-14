@@ -17,6 +17,7 @@ import {
 import { useRef } from "react";
 
 import type { MediaAsset, NodeKind, ProjectionNode, ProjectState } from "@/lib/projection-types";
+import BuiltinTestAssetsPanel from "./BuiltinTestAssetsPanel";
 
 interface Props {
   state: ProjectState;
@@ -154,7 +155,8 @@ export default function ToolPanel({
             }
           }}
         />
-        <ul className="space-y-1">
+        <BuiltinTestAssetsPanel onAddAsset={onAddAsset} />
+        <ul className="mt-2 space-y-1">
           {state.assets.length === 0 ? (
             <li className="text-xs text-muted-foreground">No assets yet.</li>
           ) : null}
