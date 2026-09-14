@@ -160,8 +160,33 @@ export function createDefaultState(): ProjectState {
     brightness: 1,
     xray: false,
     testPattern: false,
+    outputMode: "current",
+    playlist: [],
+    playlistLoop: true,
   };
 }
+
+/** Fill in fields added after a scene was saved, so older scenes keep working. */
+export function normalizeState(input: ProjectState): ProjectState {
+  const base = createDefaultState();
+  return {
+    ...base,
+    ...input,
+    outputMode: input.outputMode ?? base.outputMode,
+    playlist: Array.isArray(input.playlist) ? input.playlist : [],
+    playlistLoop: input.playlistLoop ?? true,
+    assets: (input.assets ?? []).map((a) => ({ ...a })),
+    nodes: (input.nodes ?? []).map((n) => ({
+      ...n,
+      blendMode: n.blendMode ?? "normal",
+      solo: n.solo ?? false,
+      reactSource: n.reactSource ?? "none",
+      reactTarget: n.reactTarget ?? "scale",
+      reactAmount: n.reactAmount ?? 0.5,
+    })),
+  };
+}
+
 
 
 let counter = 0;
