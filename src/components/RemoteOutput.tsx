@@ -1,7 +1,6 @@
 import { ClientOnly, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Cast, Maximize2 } from "lucide-react";
-
 import ControlDock from "@/components/ControlDock";
 import { getProjectorScene, type ProjectorStatus } from "@/lib/projector.functions";
 import type { PlaylistItem, ProjectState } from "@/lib/projection-types";
@@ -9,6 +8,16 @@ import { clearLivePlaylist, loadLivePlaylist, persistLivePlaylist } from "@/lib/
 import { useCast } from "@/lib/use-cast";
 
 const ProjectorViewport = lazy(() => import("@/components/ProjectorViewport"));
+const FS_CONSENT_KEY = "spm.remoteAutoFullscreen";
+const PLAYLIST_META = "__livePlaylist";
+
+type PublishedPlaylist = { items: PlaylistItem[]; loop: boolean; scenes: Record<string, ProjectState> };
+function readPlaylist(scene: ProjectState | null): PublishedPlaylist | null {
+  const value = (scene as (ProjectState & { [PLAYLIST_META]?: unknown }) | null)?.[PLAYLIST_META];
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<PublishedPlaylist>;
+  return Array.isArray(candidate.items) && candidate.scenes && typeof candidate.scenes === "object" ? candidate as PublishedPlaylist : null;
+}
 
 const MESSAGES: Record<Exclude<ProjectorStatus, "live" | "unchanged">, string> = {
   unknown: "No scene published yet — open the studio to start the output.",
@@ -18,28 +27,7 @@ const MESSAGES: Record<Exclude<ProjectorStatus, "live" | "unchanged">, string> =
   disabled: "Remote projector is switched off in the studio.",
 };
 
-const FS_CONSENT_KEY = "spm.remoteAutoFullscreen";
-const PLAYLIST_META = "__livePlaylist";
-
-type PublishedPlaylist = {
-  items: PlaylistItem[];
-  loop: boolean;
-  scenes: Record<string, ProjectState>;
-};
-
-function readPlaylist(scene: ProjectState | null): PublishedPlaylist | null {
-  const value = (scene as (ProjectState & { [PLAYLIST_META]?: unknown }) | null)?.[PLAYLIST_META];
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<PublishedPlaylist>;
-  if (!Array.isArray(candidate.items) || !candidate.scenes || typeof candidate.scenes !== "object") return null;
-  return candidate as PublishedPlaylist;
-}
-
-interface Props {
-  token: string;
-  allowCodeEntry?: boolean;
-}
-
+interface Props { token: string; allowCodeEntry?: boolean; }
 export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
   const navigate = useNavigate();
   const [state, setState] = useState<ProjectState | null>(null);
@@ -53,8 +41,8 @@ export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
   const revisionRef = useRef(0);
   const outputModeRef = useRef<ProjectState["outputMode"] | null>(null);
   const playlistRef = useRef<PublishedPlaylist | null>(null);
-  const playbackStartedRef = useRef(false);
-  const playbackStartedAtRef = useRef(0);
+  const startedAtRef = useRef(0);
+  const playingRef = useRef(false);
   const cast = useCast(typeof window === "undefined" ? "" : window.location.href);
 
   const toggleFullscreen = useCallback(() => {
@@ -66,61 +54,38 @@ export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
 
   useEffect(() => {
     if (typeof localStorage === "undefined") return;
-    const consented = localStorage.getItem(FS_CONSENT_KEY) === "1";
+    const consented = localStorage.getItem(FS_CONSENT_KEY) === "1';
     setAutoFullscreen(consented);
     if (!consented) return;
-    const el = shellRef.current;
-    if (!el || document.fullscreenElement) return;
-    const request = () => void el.requestFullscreen?.().catch(() => undefined);
+    const request = () => void shellRef.current?.requestFullscreen?.().catch(() => undefined);
     request();
     const once = () => { request(); window.removeEventListener("pointerdown", once); };
     window.addEventListener("pointerdown", once);
     return () => window.removeEventListener("pointerdown", once);
   }, []);
 
-  const enableAutoFullscreen = useCallback(() => {
-    if (typeof localStorage !== "undefined") localStorage.setItem(FS_CONSENT_KEY, "1");
-    setAutoFullscreen(true);
-    toggleFullscreen();
-  }, [toggleFullscreen]);
+  const enableAutoFullscreen = useCallback(() => { localStorage.setItem(FS_CONSENT_KEY, "1"); setAutoFullscreen(true); toggleFullscreen(); }, [toggleFullscreen]);
+  const disableAutoFullscreen = useCallback(() => { localStorage.removeItem(FS_CONSENT_KEY); setAutoFullscreen(false); }, []);
 
-  const disableAutoFullscreen = useCallback(() => {
-    if (typeof localStorage !== "undefined") localStorage.removeItem(FS_CONSENT_KEY);
-    setAutoFullscreen(false);
-  }, []);
-
-  // Restore the last accepted playlist before asking the server. The kiosk is
-  // deliberately self-contained: a playlist keeps running through refreshes,
-  // studio edits, and temporary network loss until outputMode changes.
+  // Restore the kiosk's last accepted playlist and its locally cached media.
   useEffect(() => {
     let cancelled = false;
-    void loadLivePlaylist().then((scenes) => {
-      if (cancelled || !scenes?.length) return;
-      const first = scenes[0]!;
-      const items = first.playlist ?? [];
-      const byId = Object.fromEntries(scenes.map((scene) => [scene.name, scene]));
-      const mapped: Record<string, ProjectState> = {};
-      for (const item of items) {
-        const scene = scenes.find((candidate) => candidate.name === item.name);
-        if (scene) mapped[item.projectId] = scene;
-      }
-      const fallback = Object.keys(mapped).length ? mapped : byId;
-      const playlist: PublishedPlaylist = { items, loop: first.playlistLoop, scenes: fallback };
-      playlistRef.current = playlist;
+    void loadLivePlaylist().then((saved) => {
+      if (cancelled || !saved) return;
+      playlistRef.current = saved;
       outputModeRef.current = "playlist";
-      setState(first);
+      const first = saved.items[0];
+      const firstScene = first ? saved.scenes[first.projectId] : null;
+      if (!firstScene) return;
+      setState(firstScene);
       setPlaylistReady(true);
       setPlaylistIndex(0);
-      playbackStartedAtRef.current = performance.now();
-      playbackStartedRef.current = true;
+      startedAtRef.current = performance.now();
+      playingRef.current = true;
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
 
-  // Poll the published snapshot. In playlist mode, a playlist received from
-  // the studio is accepted only once; subsequent revisions cannot interrupt
-  // playback. A change away from playlist mode explicitly releases the local
-  // snapshot and switches to the newly published output mode.
   useEffect(() => {
     let cancelled = false;
     revisionRef.current = 0;
@@ -135,35 +100,35 @@ export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
         const incomingPlaylist = readPlaylist(incoming);
         const incomingMode = incoming.outputMode;
 
-        if (incomingMode === "playlist" && incomingPlaylist?.items?.length) {
+        if (incomingMode === "playlist" && incomingPlaylist?.items.length) {
+          // A playlist is an immutable kiosk snapshot until Output Mode changes.
           if (outputModeRef.current !== "playlist" || !playlistRef.current) {
-            const sceneList = incomingPlaylist.items
-              .map((item) => incomingPlaylist.scenes[item.projectId])
-              .filter(Boolean);
-            if (sceneList.length) {
-              await persistLivePlaylist(sceneList);
-              playlistRef.current = incomingPlaylist;
-              outputModeRef.current = "playlist";
+            await persistLivePlaylist(incomingPlaylist);
+            playlistRef.current = incomingPlaylist;
+            outputModeRef.current = "playlist";
+            const first = incomingPlaylist.items[0];
+            const firstScene = first ? incomingPlaylist.scenes[first.projectId] : null;
+            if (firstScene) {
               setPlaylistReady(true);
               setPlaylistIndex(0);
-              playbackStartedAtRef.current = performance.now();
-              playbackStartedRef.current = true;
-              setState(sceneList[0]!);
+              setState(firstScene);
+              startedAtRef.current = performance.now();
+              playingRef.current = true;
+              setPlaylistOpacity(0);
             }
           }
           return;
         }
 
-        // This is the explicit reset mechanism: changing the Output Mode in
-        // the studio releases the kiosk's locally persisted playlist.
+        // The Output Mode selector is the explicit release/reset for the kiosk snapshot.
         if (incomingMode !== outputModeRef.current) {
           playlistRef.current = null;
-          playbackStartedRef.current = false;
+          playingRef.current = false;
           setPlaylistReady(false);
+          setPlaylistOpacity(1);
           await clearLivePlaylist();
           outputModeRef.current = incomingMode;
           setState(incoming);
-          setPlaylistOpacity(1);
         } else if (incomingMode !== "playlist") {
           setState(incoming);
         }
@@ -176,49 +141,38 @@ export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
     return () => { cancelled = true; window.clearInterval(id); };
   }, [token]);
 
-  // Local playlist transport. Timing, order, looping and fade values are read
-  // only from the persisted snapshot, so the studio is not part of playback.
   useEffect(() => {
     if (!playlistReady) return;
     const tick = () => {
       const playlist = playlistRef.current;
-      if (!playlist || !playlist.items.length || !playbackStartedRef.current) return;
-      const index = playlistIndex;
-      const item = playlist.items[index];
+      if (!playlist || !playingRef.current) return;
+      const item = playlist.items[playlistIndex];
       if (!item) return;
       const duration = Math.max(0.1, Number(item.seconds) || 0.1) * 1000;
-      const elapsed = performance.now() - playbackStartedAtRef.current;
-      const progress = Math.min(1, elapsed / duration);
-      const fade = Math.max(0, Number(item.fade) || 0) * 1000;
-      const fadeWindow = Math.min(fade, duration / 2);
-      let opacity = 1;
-      if (fadeWindow > 0 && elapsed < fadeWindow) opacity = elapsed / fadeWindow;
-      else if (fadeWindow > 0 && elapsed > duration - fadeWindow) opacity = (duration - elapsed) / fadeWindow;
+      const elapsed = performance.now() - startedAtRef.current;
+      const fade = Math.min(Math.max(0, Number(item.fade) || 0) * 1000, duration / 2);
+      const opacity = fade > 0 && elapsed < fade ? elapsed / fade : fade > 0 && elapsed > duration - fade ? (duration - elapsed) / fade : 1;
       setPlaylistOpacity(Math.max(0, Math.min(1, opacity)));
-
       if (elapsed < duration) return;
-      const nextIndex = index + 1;
+      const nextIndex = playlistIndex + 1;
       if (nextIndex < playlist.items.length) {
         const next = playlist.items[nextIndex]!;
         const nextScene = playlist.scenes[next.projectId];
-        if (nextScene) {
-          setPlaylistIndex(nextIndex);
-          setState(nextScene);
-          playbackStartedAtRef.current = performance.now();
-          setPlaylistOpacity(0);
-        }
+        if (!nextScene) return;
+        setPlaylistIndex(nextIndex);
+        setState(nextScene);
+        startedAtRef.current = performance.now();
+        setPlaylistOpacity(0);
       } else if (playlist.loop) {
         const first = playlist.items[0]!;
         const firstScene = playlist.scenes[first.projectId];
-        if (firstScene) {
-          setPlaylistIndex(0);
-          setState(firstScene);
-          playbackStartedAtRef.current = performance.now();
-          setPlaylistOpacity(0);
-        }
+        if (!firstScene) return;
+        setPlaylistIndex(0);
+        setState(firstScene);
+        startedAtRef.current = performance.now();
+        setPlaylistOpacity(0);
       } else {
-        // Hold the final scene indefinitely when looping is disabled.
-        playbackStartedRef.current = false;
+        playingRef.current = false;
         setPlaylistOpacity(1);
       }
     };
@@ -231,74 +185,21 @@ export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
     const arm = () => { window.clearTimeout(timer); timer = window.setTimeout(() => setShowBadge(false), 5000); };
     const wake = () => { setShowBadge(true); arm(); };
     arm();
-    window.addEventListener("pointerdown", wake);
-    window.addEventListener("pointermove", wake);
-    window.addEventListener("keydown", wake);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("pointerdown", wake);
-      window.removeEventListener("pointermove", wake);
-      window.removeEventListener("keydown", wake);
-    };
+    window.addEventListener("pointerdown", wake); window.addEventListener("pointermove", wake); window.addEventListener("keydown", wake);
+    return () => { window.clearTimeout(timer); window.removeEventListener("pointerdown", wake); window.removeEventListener("pointermove", wake); window.removeEventListener("keydown", wake); };
   }, []);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key.toLowerCase() === "f") toggleFullscreen(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, [toggleFullscreen]);
 
   const blank = status === "paused" || status === "disabled" || status === "unknown";
   const showScene = Boolean(state) && !blank;
-  const message = status === "offline"
-    ? "Reconnecting to the studio…"
-    : status === "live" || status === "unchanged"
-      ? null
-      : MESSAGES[status];
-
-  return (
-    <div ref={shellRef} className="relative h-screen w-screen overflow-hidden bg-black">
-      {showScene && state ? (
-        <div className="h-full w-full" style={{ opacity: state.outputMode === "playlist" ? playlistOpacity : 1, transition: "opacity 80ms linear" }}>
-          <ClientOnly fallback={<div className="h-full w-full bg-black" />}>
-            <Suspense fallback={<div className="h-full w-full bg-black" />}>
-              <ProjectorViewport state={state} showHandles={false} />
-            </Suspense>
-          </ClientOnly>
-        </div>
-      ) : (
-        <div className="h-full w-full bg-black" />
-      )}
-
-      {message && (blank || !state) ? (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 px-8 text-center">
-          <p className="max-w-md text-sm text-foreground">{message}</p>
-          {allowCodeEntry ? <p className="font-mono text-[11px] text-muted-foreground">code: {token}</p> : null}
-          {allowCodeEntry && status === "unknown" ? (
-            <button type="button" onClick={() => void navigate({ to: "/p" })} className="rounded-md border border-border px-3 py-1.5 text-[11px] text-foreground">Enter a different code</button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {message && !blank && state && showBadge ? (
-        <div className="absolute bottom-3 left-3 z-20 rounded-md border border-border bg-card/85 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur">{message}</div>
-      ) : null}
-
-      {showBadge ? (
-        <ControlDock title="Output" storageKey="spm.dock.remote" defaultPosition={{ x: typeof window === "undefined" ? 16 : Math.max(16, window.innerWidth - 220), y: 16 }} className="w-52">
-          <div className="space-y-2">
-            <button type="button" onClick={toggleFullscreen} className="flex w-full items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-foreground"><Maximize2 className="size-3" /> Fullscreen (F)</button>
-            <button type="button" onClick={autoFullscreen ? disableAutoFullscreen : enableAutoFullscreen} className={`w-full rounded-md border px-2 py-1 ${autoFullscreen ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}>{autoFullscreen ? "Auto-fullscreen ON" : "Always fullscreen on this device"}</button>
-            {cast.state !== "unsupported" ? (
-              <button type="button" onClick={() => (cast.state === "casting" ? cast.stopCast() : void cast.startCast())} disabled={cast.state === "connecting" || cast.state === "unavailable"} className={`flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50 ${cast.state === "casting" ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}>
-                <Cast className="size-3" />
-                {cast.state === "casting" ? "Stop casting" : cast.state === "connecting" ? "Connecting…" : cast.state === "unavailable" ? "No Cast device" : "Cast to TV"}
-              </button>
-            ) : null}
-            <p className="text-muted-foreground">Controls hide after 5s — tap to show.</p>
-          </div>
-        </ControlDock>
-      ) : null}
-    </div>
-  );
+  const message = status === "offline" ? "Reconnecting to the studio…" : status === "live" || status === "unchanged" ? null : MESSAGES[status];
+  return <div ref={shellRef} className="relative h-screen w-screen overflow-hidden bg-black">
+    {showScene && state ? <div className="h-full w-full" style={{ opacity: state.outputMode === "playlist" ? playlistOpacity : 1, transition: "opacity 80ms linear" }}><ClientOnly fallback={<div className="h-full w-full bg-black" />}><Suspense fallback={<div className="h-full w-full bg-black" />}><ProjectorViewport state={state} showHandles={false} /></Suspense></ClientOnly></div> : <div className="h-full w-full bg-black" />}
+    {message && (blank || !state) ? <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 px-8 text-center"><p className="max-w-md text-sm text-foreground">{message}</p>{allowCodeEntry ? <p className="font-mono text-[11px] text-muted-foreground">code: {token}</p> : null}{allowCodeEntry && status === "unknown" ? <button type="button" onClick={() => void navigate({ to: "/p" })} className="rounded-md border border-border px-3 py-1.5 text-[11px] text-foreground">Enter a different code</button> : null}</div> : null}
+    {message && !blank && state && showBadge ? <div className="absolute bottom-3 left-3 z-20 rounded-md border border-border bg-card/85 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur">{message}</div> : null}
+    {showBadge ? <ControlDock title="Output" storageKey="spm.dock.remote" defaultPosition={{ x: typeof window === "undefined" ? 16 : Math.max(16, window.innerWidth - 220), y: 16 }} className="w-52"><div className="space-y-2"><button type="button" onClick={toggleFullscreen} className="flex w-full items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-foreground"><Maximize2 className="size-3" /> Fullscreen (F)</button><button type="button" onClick={autoFullscreen ? disableAutoFullscreen : enableAutoFullscreen} className={`w-full rounded-md border px-2 py-1 ${autoFullscreen ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}>{autoFullscreen ? "Auto-fullscreen ON" : "Always fullscreen on this device"}</button>{cast.state !== "unsupported" ? <button type="button" onClick={() => (cast.state === "casting" ? cast.stopCast() : void cast.startCast())} disabled={cast.state === "connecting" || cast.state === "unavailable"} className={`flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50 ${cast.state === "casting" ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}><Cast className="size-3" />{cast.state === "casting" ? "Stop casting" : cast.state === "connecting" ? "Connecting…" : cast.state === "unavailable" ? "No Cast device" : "Cast to TV"}</button> : null}<p className="text-muted-foreground">Controls hide after 5s — tap to show.</p></div></ControlDock> : null}
+  </div>;
 }
