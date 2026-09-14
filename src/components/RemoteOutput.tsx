@@ -4,29 +4,22 @@ import { Cast, Maximize2 } from "lucide-react";
 import ControlDock from "@/components/ControlDock";
 import { getProjectorScene, type ProjectorStatus } from "@/lib/projector.functions";
 import type { PlaylistItem, ProjectState } from "@/lib/projection-types";
-import { clearLivePlaylist, loadLivePlaylist, persistLivePlaylist } from "@/lib/live-playlist-store";
+import { clearLivePlaylist, loadLivePlaylist, persistLivePlaylist, type LivePlaylistSnapshot } from "@/lib/live-playlist-store";
 import { useCast } from "@/lib/use-cast";
 
 const ProjectorViewport = lazy(() => import("@/components/ProjectorViewport"));
 const FS_CONSENT_KEY = "spm.remoteAutoFullscreen";
 const PLAYLIST_META = "__livePlaylist";
-
-type PublishedPlaylist = { items: PlaylistItem[]; loop: boolean; scenes: Record<string, ProjectState> };
+type PublishedPlaylist = LivePlaylistSnapshot;
 function readPlaylist(scene: ProjectState | null): PublishedPlaylist | null {
-  const value = (scene as (ProjectState & { [PLAYLIST_META]?: unknown }) | null)?.[PLAYLIST_META];
+  const value = scene ? (scene as unknown as Record<string, unknown>)[PLAYLIST_META] : null;
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<PublishedPlaylist>;
   return Array.isArray(candidate.items) && candidate.scenes && typeof candidate.scenes === "object" ? candidate as PublishedPlaylist : null;
 }
-
 const MESSAGES: Record<Exclude<ProjectorStatus, "live" | "unchanged">, string> = {
-  unknown: "No scene published yet — open the studio to start the output.",
-  waiting: "Waiting for the first scene from the studio…",
-  stale: "Studio offline — showing the last published scene.",
-  paused: "Output paused from the studio.",
-  disabled: "Remote projector is switched off in the studio.",
+  unknown: "No scene published yet — open the studio to start the output.", waiting: "Waiting for the first scene from the studio…", stale: "Studio offline — showing the last published scene.", paused: "Output paused from the studio.", disabled: "Remote projector is switched off in the studio.",
 };
-
 interface Props { token: string; allowCodeEntry?: boolean; }
 export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
   const navigate = useNavigate();
@@ -44,157 +37,75 @@ export default function RemoteOutput({ token, allowCodeEntry = false }: Props) {
   const startedAtRef = useRef(0);
   const playingRef = useRef(false);
   const cast = useCast(typeof window === "undefined" ? "" : window.location.href);
-
-  const toggleFullscreen = useCallback(() => {
-    const el = shellRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void el.requestFullscreen?.().catch(() => undefined);
-  }, []);
-
+  const toggleFullscreen = useCallback(() => { const el = shellRef.current; if (!el) return; if (document.fullscreenElement) void document.exitFullscreen(); else void el.requestFullscreen?.().catch(() => undefined); }, []);
   useEffect(() => {
-    if (typeof localStorage === "undefined") return;
-    const consented = localStorage.getItem(FS_CONSENT_KEY) === "1';
-    setAutoFullscreen(consented);
-    if (!consented) return;
-    const request = () => void shellRef.current?.requestFullscreen?.().catch(() => undefined);
-    request();
-    const once = () => { request(); window.removeEventListener("pointerdown", once); };
-    window.addEventListener("pointerdown", once);
+    const consented = localStorage.getItem(FS_CONSENT_KEY) === "1"; setAutoFullscreen(consented); if (!consented) return;
+    const request = () => void shellRef.current?.requestFullscreen?.().catch(() => undefined); request();
+    const once = () => { request(); window.removeEventListener("pointerdown", once); }; window.addEventListener("pointerdown", once);
     return () => window.removeEventListener("pointerdown", once);
   }, []);
-
   const enableAutoFullscreen = useCallback(() => { localStorage.setItem(FS_CONSENT_KEY, "1"); setAutoFullscreen(true); toggleFullscreen(); }, [toggleFullscreen]);
   const disableAutoFullscreen = useCallback(() => { localStorage.removeItem(FS_CONSENT_KEY); setAutoFullscreen(false); }, []);
 
-  // Restore the kiosk's last accepted playlist and its locally cached media.
   useEffect(() => {
     let cancelled = false;
     void loadLivePlaylist().then((saved) => {
       if (cancelled || !saved) return;
-      playlistRef.current = saved;
-      outputModeRef.current = "playlist";
-      const first = saved.items[0];
-      const firstScene = first ? saved.scenes[first.projectId] : null;
-      if (!firstScene) return;
-      setState(firstScene);
-      setPlaylistReady(true);
-      setPlaylistIndex(0);
-      startedAtRef.current = performance.now();
-      playingRef.current = true;
+      playlistRef.current = saved; outputModeRef.current = "playlist";
+      const first = saved.items[0] ? saved.scenes[saved.items[0]!.projectId] : null; if (!first) return;
+      setState(first); setPlaylistReady(true); setPlaylistIndex(0); startedAtRef.current = performance.now(); playingRef.current = true;
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    revisionRef.current = 0;
+    let cancelled = false; revisionRef.current = 0;
     const tick = async () => {
       try {
-        const snap = await getProjectorScene({ data: { token, sinceRevision: revisionRef.current } });
-        if (cancelled) return;
-        setStatus(snap.status);
-        if (!snap.scene) return;
-        revisionRef.current = snap.revision;
-        const incoming = snap.scene as unknown as ProjectState;
-        const incomingPlaylist = readPlaylist(incoming);
-        const incomingMode = incoming.outputMode;
-
+        const snap = await getProjectorScene({ data: { token, sinceRevision: revisionRef.current } }); if (cancelled) return;
+        setStatus(snap.status); if (!snap.scene) return; revisionRef.current = snap.revision;
+        const incoming = snap.scene as unknown as ProjectState; const incomingPlaylist = readPlaylist(incoming); const incomingMode = incoming.outputMode;
         if (incomingMode === "playlist" && incomingPlaylist?.items.length) {
-          // A playlist is an immutable kiosk snapshot until Output Mode changes.
           if (outputModeRef.current !== "playlist" || !playlistRef.current) {
-            await persistLivePlaylist(incomingPlaylist);
-            playlistRef.current = incomingPlaylist;
-            outputModeRef.current = "playlist";
-            const first = incomingPlaylist.items[0];
-            const firstScene = first ? incomingPlaylist.scenes[first.projectId] : null;
-            if (firstScene) {
-              setPlaylistReady(true);
-              setPlaylistIndex(0);
-              setState(firstScene);
-              startedAtRef.current = performance.now();
-              playingRef.current = true;
-              setPlaylistOpacity(0);
-            }
+            await persistLivePlaylist(incomingPlaylist); playlistRef.current = incomingPlaylist; outputModeRef.current = "playlist"; setPlaylistReady(true); setPlaylistIndex(0);
+            const first = incomingPlaylist.items[0] ? incomingPlaylist.scenes[incomingPlaylist.items[0]!.projectId] : null;
+            if (first) { setState(first); startedAtRef.current = performance.now(); playingRef.current = true; setPlaylistOpacity(0); }
           }
           return;
         }
-
-        // The Output Mode selector is the explicit release/reset for the kiosk snapshot.
         if (incomingMode !== outputModeRef.current) {
-          playlistRef.current = null;
-          playingRef.current = false;
-          setPlaylistReady(false);
-          setPlaylistOpacity(1);
-          await clearLivePlaylist();
-          outputModeRef.current = incomingMode;
-          setState(incoming);
-        } else if (incomingMode !== "playlist") {
-          setState(incoming);
-        }
-      } catch {
-        if (!cancelled) setStatus("offline");
-      }
+          playlistRef.current = null; playingRef.current = false; setPlaylistReady(false); setPlaylistOpacity(1); await clearLivePlaylist(); outputModeRef.current = incomingMode; setState(incoming);
+        } else if (incomingMode !== "playlist") setState(incoming);
+      } catch { if (!cancelled) setStatus("offline"); }
     };
-    void tick();
-    const id = window.setInterval(() => void tick(), 1500);
-    return () => { cancelled = true; window.clearInterval(id); };
+    void tick(); const id = window.setInterval(() => void tick(), 1500); return () => { cancelled = true; window.clearInterval(id); };
   }, [token]);
 
   useEffect(() => {
     if (!playlistReady) return;
     const tick = () => {
-      const playlist = playlistRef.current;
-      if (!playlist || !playingRef.current) return;
-      const item = playlist.items[playlistIndex];
-      if (!item) return;
-      const duration = Math.max(0.1, Number(item.seconds) || 0.1) * 1000;
-      const elapsed = performance.now() - startedAtRef.current;
+      const playlist = playlistRef.current; if (!playlist || !playingRef.current) return;
+      const item = playlist.items[playlistIndex]; if (!item) return;
+      const duration = Math.max(0.1, Number(item.seconds) || 0.1) * 1000; const elapsed = performance.now() - startedAtRef.current;
       const fade = Math.min(Math.max(0, Number(item.fade) || 0) * 1000, duration / 2);
       const opacity = fade > 0 && elapsed < fade ? elapsed / fade : fade > 0 && elapsed > duration - fade ? (duration - elapsed) / fade : 1;
-      setPlaylistOpacity(Math.max(0, Math.min(1, opacity)));
-      if (elapsed < duration) return;
-      const nextIndex = playlistIndex + 1;
-      if (nextIndex < playlist.items.length) {
-        const next = playlist.items[nextIndex]!;
-        const nextScene = playlist.scenes[next.projectId];
-        if (!nextScene) return;
-        setPlaylistIndex(nextIndex);
-        setState(nextScene);
-        startedAtRef.current = performance.now();
-        setPlaylistOpacity(0);
-      } else if (playlist.loop) {
-        const first = playlist.items[0]!;
-        const firstScene = playlist.scenes[first.projectId];
-        if (!firstScene) return;
-        setPlaylistIndex(0);
-        setState(firstScene);
-        startedAtRef.current = performance.now();
-        setPlaylistOpacity(0);
-      } else {
-        playingRef.current = false;
-        setPlaylistOpacity(1);
-      }
+      setPlaylistOpacity(Math.max(0, Math.min(1, opacity))); if (elapsed < duration) return;
+      const nextIndex = playlistIndex + 1; const next = nextIndex < playlist.items.length ? playlist.items[nextIndex] : playlist.loop ? playlist.items[0] : null;
+      if (!next) { playingRef.current = false; setPlaylistOpacity(1); return; }
+      const nextScene = playlist.scenes[next.projectId]; if (!nextScene) return;
+      setPlaylistIndex(nextIndex < playlist.items.length ? nextIndex : 0); setState(nextScene); startedAtRef.current = performance.now(); setPlaylistOpacity(0);
     };
-    const id = window.setInterval(tick, 50);
-    return () => window.clearInterval(id);
+    const id = window.setInterval(tick, 50); return () => window.clearInterval(id);
   }, [playlistIndex, playlistReady]);
 
   useEffect(() => {
-    let timer = 0;
-    const arm = () => { window.clearTimeout(timer); timer = window.setTimeout(() => setShowBadge(false), 5000); };
-    const wake = () => { setShowBadge(true); arm(); };
-    arm();
+    let timer = 0; const arm = () => { window.clearTimeout(timer); timer = window.setTimeout(() => setShowBadge(false), 5000); }; const wake = () => { setShowBadge(true); arm(); }; arm();
     window.addEventListener("pointerdown", wake); window.addEventListener("pointermove", wake); window.addEventListener("keydown", wake);
     return () => { window.clearTimeout(timer); window.removeEventListener("pointerdown", wake); window.removeEventListener("pointermove", wake); window.removeEventListener("keydown", wake); };
   }, []);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key.toLowerCase() === "f") toggleFullscreen(); };
-    window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
-  }, [toggleFullscreen]);
+  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key.toLowerCase() === "f") toggleFullscreen(); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, [toggleFullscreen]);
 
-  const blank = status === "paused" || status === "disabled" || status === "unknown";
-  const showScene = Boolean(state) && !blank;
+  const blank = status === "paused" || status === "disabled" || status === "unknown"; const showScene = Boolean(state) && !blank;
   const message = status === "offline" ? "Reconnecting to the studio…" : status === "live" || status === "unchanged" ? null : MESSAGES[status];
   return <div ref={shellRef} className="relative h-screen w-screen overflow-hidden bg-black">
     {showScene && state ? <div className="h-full w-full" style={{ opacity: state.outputMode === "playlist" ? playlistOpacity : 1, transition: "opacity 80ms linear" }}><ClientOnly fallback={<div className="h-full w-full bg-black" />}><Suspense fallback={<div className="h-full w-full bg-black" />}><ProjectorViewport state={state} showHandles={false} /></Suspense></ClientOnly></div> : <div className="h-full w-full bg-black" />}
