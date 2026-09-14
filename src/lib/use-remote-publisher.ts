@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { loadProject } from "./project-store";
 import { createMediaUploadUrl, publishProjectorScene, type SceneJson } from "./projector.functions";
 import type { ProjectState } from "./projection-types";
 
@@ -27,10 +28,37 @@ async function uploadOne(token: string, url: string, name: string): Promise<stri
 }
 
 async function prepareScene(state: ProjectState, token: string): Promise<SceneJson> {
-  const assets = await Promise.all(state.assets.map(async (asset) => ({ ...asset, url: (await uploadOne(token, asset.url, asset.name)) ?? asset.url })));
+  const assets = await Promise.all(state.assets.map(async (asset) => {
+    // Code-only assets (shaders, camera/live sources, generated visuals) are
+    // already self-contained and must not be sent through media storage.
+    if (asset.kind !== "image" && asset.kind !== "video") return asset;
+    return { ...asset, url: (await uploadOne(token, asset.url, asset.name)) ?? asset.url };
+  }));
   const backgroundUrl = state.background.url ? await uploadOne(token, state.background.url, "background") : null;
   const scene: ProjectState = { ...state, assets, background: { ...state.background, url: backgroundUrl }, selectedId: null };
   return scene as unknown as SceneJson;
+}
+
+async function preparePlaylist(state: ProjectState, token: string) {
+  if (state.outputMode !== "playlist" || state.playlist.length === 0) return null;
+  const scenes: Record<string, SceneJson> = {};
+  for (const item of state.playlist) {
+    const project = await loadProject(item.projectId);
+    if (!project) continue;
+    scenes[item.projectId] = await prepareScene(project, token);
+  }
+  return {
+    items: state.playlist,
+    loop: state.playlistLoop,
+    scenes,
+  };
+}
+
+async function preparePublishPayload(state: ProjectState, token: string): Promise<SceneJson> {
+  const scene = await prepareScene(state, token);
+  const playlist = await preparePlaylist(state, token);
+  if (playlist) (scene as Record<string, unknown>).__livePlaylist = playlist;
+  return scene;
 }
 
 interface Options { token: string | null; enabled: boolean; paused: boolean; label: string; }
@@ -41,7 +69,7 @@ export function useRemotePublisher(state: ProjectState, { token, enabled, paused
     if (!token || !enabled) return;
     if (inFlight.current) { pending.current = true; return; }
     inFlight.current = true;
-    try { setPhase("uploading"); const scene = await prepareScene(stateRef.current, token); setPhase("publishing"); await publishProjectorScene({ data: { token, scene, enabled: true, paused, label } }); setPublishedAt(Date.now()); setError(null); setPhase("ok"); }
+    try { setPhase("uploading"); const scene = await preparePublishPayload(stateRef.current, token); setPhase("publishing"); await publishProjectorScene({ data: { token, scene, enabled: true, paused, label } }); setPublishedAt(Date.now()); setError(null); setPhase("ok"); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Publish failed"); setPhase("error"); }
     finally { inFlight.current = false; if (pending.current) { pending.current = false; void publish(); } }
   }, [enabled, label, paused, token]);
