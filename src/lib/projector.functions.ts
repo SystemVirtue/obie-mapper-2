@@ -26,17 +26,35 @@ const readSchema = z.object({
 
 /** Only projectable media may be uploaded — the bucket is not general storage. */
 const ALLOWED_MEDIA = /^(image\/(png|jpeg|webp|gif|avif)|video\/(mp4|webm|quicktime))$/;
+const MEDIA_BY_EXT: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+};
+
+function canonicalMediaType(fileName: string, contentType: string) {
+  const normalized = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (ALLOWED_MEDIA.test(normalized)) return normalized;
+  const extension = fileName.toLowerCase().split(".").pop() ?? "";
+  return MEDIA_BY_EXT[extension] ?? normalized;
+}
 
 const uploadSchema = z.object({
   token: tokenSchema,
   fileName: z.string().trim().min(1).max(200),
-  contentType: z
-    .string()
-    .trim()
-    .min(3)
-    .max(120)
-    .transform((value) => value.split(";")[0]!.trim().toLowerCase())
-    .refine((value) => ALLOWED_MEDIA.test(value), "Unsupported media type"),
+  contentType: z.string().trim().min(3).max(120),
+}).transform((data) => ({
+  ...data,
+  contentType: canonicalMediaType(data.fileName, data.contentType),
+})).refine((data) => ALLOWED_MEDIA.test(data.contentType), {
+  path: ["contentType"],
+  message: "Unsupported media type",
 });
 
 export type ProjectorStatus =
@@ -108,8 +126,6 @@ export const publishProjectorScene = createServerFn({ method: "POST" })
       .eq("token", data.token)
       .maybeSingle();
 
-    // Only codes minted by createProjectorChannel may be published to, so a
-    // caller cannot conjure channels (and their storage prefix) at will.
     if (!existing) throw new Error("Unknown projector code");
 
     const payload = {
@@ -142,13 +158,10 @@ export const getProjectorScene = createServerFn({ method: "POST" })
       .eq("token", data.token)
       .maybeSingle();
 
-    if (!row) {
-      return { status: "unknown", revision: 0, scene: null, updatedAt: null, label: null };
-    }
+    if (!row) return { status: "unknown", revision: 0, scene: null, updatedAt: null, label: null };
 
     const revision = Number(row.revision ?? 0);
     const base = { revision, updatedAt: row.updated_at, label: row.label } as const;
-
     const status: ProjectorStatus = !row.enabled
       ? "disabled"
       : row.paused
@@ -173,9 +186,6 @@ export const createMediaUploadUrl = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => uploadSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    // Uploads are only for real, existing channels — never for an arbitrary
-    // token shape, so the bucket cannot be used as open file hosting.
     const { data: channel } = await supabaseAdmin
       .from("projector_channels")
       .select("id")
@@ -185,51 +195,30 @@ export const createMediaUploadUrl = createServerFn({ method: "POST" })
 
     const safeName = data.fileName.replace(/[^A-Za-z0-9._-]/g, "_").slice(-80);
     const path = `${data.token}/${Date.now().toString(36)}_${safeName}`;
-
     const { data: signed, error } = await supabaseAdmin.storage
       .from("projector-media")
       .createSignedUploadUrl(path);
     if (error || !signed) throw new Error(error?.message ?? "Could not create upload URL");
-
     return { path, signedUrl: signed.signedUrl, token: signed.token };
   });
 
-type AdminClient = Awaited<
-  typeof import("@/integrations/supabase/client.server")
->["supabaseAdmin"];
+type AdminClient = Awaited<typeof import("@/integrations/supabase/client.server")["supabaseAdmin"]>;
 
-/** Replace `storage:<path>` references in a published scene with signed URLs. */
 async function signSceneAssets(scene: SceneJson, admin: AdminClient) {
   const assets = scene["assets"];
   const paths: string[] = [];
   const collect = (value: unknown) => {
     if (typeof value === "string" && value.startsWith("storage:")) paths.push(value.slice(8));
   };
-  if (Array.isArray(assets)) {
-    for (const asset of assets) collect((asset as { url?: unknown } | null)?.url);
-  }
+  if (Array.isArray(assets)) for (const asset of assets) collect((asset as { url?: unknown } | null)?.url);
   const background = scene["background"] as { url?: Json } | null | undefined;
   collect(background?.url);
   if (paths.length === 0) return;
 
-  const { data: signed } = await admin.storage
-    .from("projector-media")
-    .createSignedUrls(paths, 60 * 60 * 6);
+  const { data: signed } = await admin.storage.from("projector-media").createSignedUrls(paths, 60 * 60 * 6);
   const map = new Map<string, string>();
-  for (const entry of signed ?? []) {
-    if (entry.path && entry.signedUrl) map.set(entry.path, entry.signedUrl);
-  }
-
-  const resolve = (value: unknown) =>
-    typeof value === "string" && value.startsWith("storage:")
-      ? (map.get(value.slice(8)) ?? null)
-      : value;
-
-  if (Array.isArray(assets)) {
-    for (const asset of assets) {
-      const record = asset as { url?: Json };
-      if (record) record.url = resolve(record.url) as Json;
-    }
-  }
+  for (const entry of signed ?? []) if (entry.path && entry.signedUrl) map.set(entry.path, entry.signedUrl);
+  const resolve = (value: unknown) => typeof value === "string" && value.startsWith("storage:") ? (map.get(value.slice(8)) ?? null) : value;
+  if (Array.isArray(assets)) for (const asset of assets) (asset as { url?: Json }).url = resolve((asset as { url?: Json }).url) as Json;
   if (background) background.url = resolve(background.url) as Json;
 }
