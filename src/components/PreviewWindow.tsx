@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Move, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Move } from "lucide-react";
 import { ClientOnly } from "@tanstack/react-router";
 import type { CornerPin, ProjectState } from "@/lib/projection-types";
 import ProjectorViewport from "@/components/ProjectorViewport";
 
-interface Props { state: ProjectState; onCornersChange: (corners: CornerPin[]) => void; onClose?: () => void; }
+interface Props { state: ProjectState; onCornersChange: (corners: CornerPin[]) => void; }
 const MIN_W = 300, MIN_H = 220;
 
 export default function PreviewWindow({ state, onCornersChange }: Props) {
@@ -13,7 +13,6 @@ export default function PreviewWindow({ state, onCornersChange }: Props) {
   const [size, setSize] = useState({ w: 520, h: 340 });
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const resize = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-
   useEffect(() => {
     const move = (e: PointerEvent) => {
       if (drag.current) setPos({ x: Math.max(0, drag.current.x + e.clientX - drag.current.px), y: Math.max(0, drag.current.y + e.clientY - drag.current.py) });
@@ -23,7 +22,6 @@ export default function PreviewWindow({ state, onCornersChange }: Props) {
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
   }, []);
-
   return <div className="fixed z-50 overflow-hidden rounded-lg border border-primary/50 bg-card shadow-2xl" style={{ left: pos.x, top: pos.y, width: size.w, height: collapsed ? 38 : size.h }}>
     <div className="flex h-[38px] cursor-move select-none items-center gap-2 border-b border-border bg-card/95 px-2" onPointerDown={(e) => { drag.current = { x: pos.x, y: pos.y, px: e.clientX, py: e.clientY }; }}>
       <Move className="size-3 text-primary" /><span className="text-xs font-semibold">Preview</span><span className="text-[10px] text-muted-foreground">Live Output</span><span className="ml-auto" />
